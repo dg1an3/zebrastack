@@ -1,5 +1,7 @@
 ﻿module SlopeInterceptObjective
 
+open LeastSquaresLib
+
 // compute current value given current slope intercept parameters
 let currentValueFromSlopeOffset init [slope; offset] =
     init

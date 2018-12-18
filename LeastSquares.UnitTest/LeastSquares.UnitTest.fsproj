@@ -18,6 +18,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\LeastSquaresLib\LeastSquaresLib.fsproj" />
     <ProjectReference Include="..\LeastSquares\LeastSquares.fsproj" />
   </ItemGroup>
 

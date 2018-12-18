@@ -2,6 +2,7 @@ namespace LeastSquares.UnitTest
 
 open System
 open Microsoft.VisualStudio.TestTools.UnitTesting
+open LeastSquaresLib
 
 [<TestClass>]
 type TestClass () =

@@ -46,7 +46,6 @@
   <Import Project="$(FSharpTargetsPath)" />
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
-    <Compile Include="Helper.fs" />
     <Compile Include="LeastSqOptimizer.fs" />
     <Compile Include="SlopeInterceptObjective.fs" />
     <Compile Include="Program.fs" />
@@ -65,6 +64,13 @@
       <HintPath>..\packages\System.ValueTuple.4.4.0\lib\net461\System.ValueTuple.dll</HintPath>
       <Private>True</Private>
     </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\LeastSquaresLib\LeastSquaresLib.fsproj">
+      <Name>LeastSquaresLib</Name>
+      <Project>{16cf630e-5558-4dea-a306-032456ef9dbe}</Project>
+      <Private>True</Private>
+    </ProjectReference>
   </ItemGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
