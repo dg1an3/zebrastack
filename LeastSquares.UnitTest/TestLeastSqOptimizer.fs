@@ -8,10 +8,19 @@ open LeastSquaresLib.LeastSqOptimizer
 open LeastSquaresLib.SlopeInterceptObjective
 
 [<TestClass>]
-type TestClass () =
+type TestLeastSqOptimizer () =
 
     [<TestMethod>]
-    member this.TestSlopeInterceptOptimization() =      
+    member __.TestQuadraticLoss() = ()
+
+    [<TestMethod>]
+    member __.TestStabilize() = ()
+
+    [<TestMethod>]
+    member __.Test_dParam_dLoss() = ()
+
+    [<TestMethod>]
+    member __.TestSlopeInterceptOptimization() =      
 
         let target = [| 0.0; 3.0; 5.0; -2.0; |]
         printfn "target = %A" target
