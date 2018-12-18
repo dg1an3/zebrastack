@@ -28,19 +28,8 @@ let initOffset = 0.0
     
 printfn "initial loss %f" (loss target iter0 [initSlope; initOffset])
 
-let dSlope_dLoss [slope; offset] = 
-    let d = (loss target iter0 [slope + LeastSqOptimizer.delta; offset]) - (loss target iter0 [slope; offset])
-    LeastSqOptimizer.delta / if d < 0.0 then d - 0.1 else d + 0.1
-    // iter0 |> Array.map ((*) 1.0)
-
-let dOffset_dLoss [slope; offset] =
-    let d = (loss target iter0 [slope; offset + LeastSqOptimizer.delta]) - (loss target iter0 [slope; offset])
-    LeastSqOptimizer.delta / if d < 0.0 then d - 0.1 else d + 0.1
-    // iter0 |> Array.map (fun x -> 1.0)
-    
 let update ([currentSlope; currentOffset], currentLoss) = 
-    let dSlope = dSlope_dLoss [currentSlope; currentOffset]
-    let dOffset = dOffset_dLoss [currentSlope; currentOffset]
+    let [dSlope; dOffset] = LeastSqOptimizer.dParam_dLoss (loss target iter0) [currentSlope; currentOffset]
     let updateSlope = currentSlope - LeastSqOptimizer.rate * dSlope
     let updateOffset = currentOffset - LeastSqOptimizer.rate * dOffset
     let updateLoss = loss target iter0 [updateSlope; updateOffset]

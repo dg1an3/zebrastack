@@ -7,14 +7,14 @@ module LeastSqOptimizer =
 
     let stabilize x =
         if x < 0.0
-        then x - delta
-        else x + delta
+        then x - 0.1
+        else x + 0.1
 
-    let dParam_dLoss (lossFunc:list<float>->float) (atParams:list<float>) =
+    let dParam_dLoss (lossFunc:list<float>->float) (atParams:list<float>) : list<float> =
         let loss = lossFunc atParams
-        seq { 0..atParams |> List.length }
-        |> Seq.map 
-            (fun outer 
+        atParams
+        |> Seq.mapi
+            (fun outer _
                 -> atParams
                 |> List.mapi 
                     (fun inner el 
@@ -22,7 +22,7 @@ module LeastSqOptimizer =
                             then el+delta 
                             else el))
         |> Seq.map lossFunc
-        |> Seq.map ((-) loss)
+        |> Seq.map ((+) -loss)
         |> Seq.map stabilize
         |> Seq.map ((/) delta)
         |> List.ofSeq
