@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <Compile Include="Helper.fs" />
+    <Compile Include="SlopeInterceptObjective.fs" />
     <Compile Include="LeastSqOptimizer.fs" />
   </ItemGroup>
 

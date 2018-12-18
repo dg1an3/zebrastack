@@ -1,6 +1,6 @@
 ﻿open LeastSquaresLib
 open LeastSquaresLib.LeastSqOptimizer
-open SlopeInterceptObjective
+open LeastSquaresLib.SlopeInterceptObjective
 
 // Learn more about F# at http://fsharp.org
 // See the 'F# Tutorial' project for more help.
