@@ -6,6 +6,7 @@
 
   <ItemGroup>
     <Compile Include="Helper.fs" />
+    <Compile Include="LeastSqOptimizer.fs" />
   </ItemGroup>
 
 </Project>
