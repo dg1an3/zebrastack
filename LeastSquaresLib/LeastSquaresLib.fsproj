@@ -4,6 +4,10 @@
     <TargetFramework>netstandard2.0</TargetFramework>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <DefineConstants>TRACE;PRINT_UNFOLD_UPDATES</DefineConstants>
+  </PropertyGroup>
+
   <ItemGroup>
     <Compile Include="Helper.fs" />
     <Compile Include="LeastSqOptimizer.fs" />
