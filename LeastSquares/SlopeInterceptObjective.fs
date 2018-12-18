@@ -8,11 +8,7 @@ let currentValueFromSlopeOffset init [slope; offset] =
 
 let target = [| 0.0; 3.0; 5.0; -2.0; |]
 
-let genRandomNumbers count =
-    let rnd = System.Random()
-    Array.init count (fun _ -> 10.0 * rnd.NextDouble())
-
-let iter0 = genRandomNumbers 4
+let iter0 = Helper.genRandomNumbers 4
     
 printfn "target:        %A" target
 printfn "init:          %A" iter0
