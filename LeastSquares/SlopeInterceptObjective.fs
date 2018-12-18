@@ -28,11 +28,11 @@ let initOffset = 0.0
     
 printfn "initial loss %f" (loss target iter0 [initSlope; initOffset])
 
-let update ([currentSlope; currentOffset], currentLoss) = 
+let update (lossFunc:list<float>->float) ([currentSlope; currentOffset], currentLoss) = 
     let [dSlope; dOffset] = LeastSqOptimizer.dParam_dLoss (loss target iter0) [currentSlope; currentOffset]
     let updateSlope = currentSlope - LeastSqOptimizer.rate * dSlope
     let updateOffset = currentOffset - LeastSqOptimizer.rate * dOffset
-    let updateLoss = loss target iter0 [updateSlope; updateOffset]
+    let updateLoss = lossFunc [updateSlope; updateOffset]
 
     printfn "updated slope = %f (%4.2f %%), offset = %f (%4.2f %%), loss = %f" 
         updateSlope (100.0 * abs(dSlope)/(LeastSqOptimizer.delta + abs(currentSlope)))
@@ -44,7 +44,7 @@ let update ([currentSlope; currentOffset], currentLoss) =
     else Some (([updateSlope; updateOffset], updateLoss), ([updateSlope; updateOffset], updateLoss))
 
 let optimize = 
-    Seq.unfold update ([initSlope; initOffset], loss target iter0 [initSlope; initOffset])
+    Seq.unfold (update (loss target iter0)) ([initSlope; initOffset], loss target iter0 [initSlope; initOffset])
     |> List.ofSeq
     |> List.last
     |> function

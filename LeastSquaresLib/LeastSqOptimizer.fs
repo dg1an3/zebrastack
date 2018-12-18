@@ -30,8 +30,8 @@ module LeastSqOptimizer =
     let update (lossFunc:list<float>->float) (currentParams:list<float>, currentLoss:float) = 
         let dParams = dParam_dLoss lossFunc currentParams
         let updatedParams = 
-            (dParams |> List.map ((*) rate), 
-                    currentParams) 
+            (currentParams, 
+                dParams |> List.map ((*) rate)) 
                 ||> List.map2 (-)
         let updatedLoss = lossFunc updatedParams
 
