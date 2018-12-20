@@ -10,7 +10,7 @@ let main argv =
     let target = [| 0.0; 3.0; 5.0; -2.0; |]
     printfn "target = %A" target
 
-    let iter0 = Helper.genRandomNumbers 4
+    let iter0 = Helper.genRandomNumbers (0.0, 10.0) 4
     printfn "iter0 = %A" iter0
 
     let initSlope = 1.0

@@ -4,5 +4,5 @@ module Helper =
 
     let rnd = System.Random()
 
-    let genRandomNumbers count =
-        Array.init count (fun _ -> 10.0 * rnd.NextDouble())
+    let genRandomNumbers (min, max) count =
+        Array.init count (fun _ -> min + (max - min) * rnd.NextDouble())
