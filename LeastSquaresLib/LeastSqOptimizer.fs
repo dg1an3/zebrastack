@@ -2,14 +2,23 @@
 
 module LeastSqOptimizer =
 
+    open LeastSquaresLib.Helper
+    open LeastSquaresLib.VectorND
+
+    // TODO: define some types
+    type SignalType = VectorND
+    type OptimizerParameters = list<float>
+
+    type LossFunction = OptimizerParameters->float
+
     // calculate quadratic loss between
     //      * target as array of float
     //      * evaluation of currentFunc at params
     let quadraticLoss 
-                (target:float[]) 
-                (currentFunc:list<float>->float[]) 
-                (forParams:list<float>) =
-        (target, currentFunc forParams) 
+                (target:SignalType) 
+                (currentFunc:OptimizerParameters->SignalType) 
+                (forParams:OptimizerParameters) =
+        (target.values, (currentFunc forParams).values) 
             ||> Array.map2 (-) 
             |> Array.sumBy (fun x -> x*x)
 
@@ -21,12 +30,12 @@ module LeastSqOptimizer =
         else x + 0.1
 
     // delta parameter controls numerical approximation of gradient
-    let delta = 0.01
+    let delta = 0.1
 
     // gradient of loss function with respect to parameter vector
-    let dParam_dLoss 
-                (lossFunc:list<float>->float) 
-                (atParams:list<float>) : list<float> =
+    let dLoss_dParam
+                (lossFunc:LossFunction) 
+                (atParams:OptimizerParameters) : OptimizerParameters =
         let loss = lossFunc atParams
         atParams
         |> Seq.mapi
@@ -40,38 +49,47 @@ module LeastSqOptimizer =
         |> Seq.map lossFunc
         |> Seq.map ((+) -loss)
         |> Seq.map stabilize
-        |> Seq.map ((/) delta)
+        |> Seq.map ((*) (1.0/delta))
         |> List.ofSeq
 
     // update rate determines how much each update pulls the parameters
     let rate = 0.95
 
+    let percentDifference previous updated = 
+        (previous, updated)
+        ||> List.map2 
+            (fun updatedEl currentEl 
+                -> 100.0 * abs(updatedEl - currentEl)
+                    /(delta + abs(currentEl)))
+
     // Seq.unfold-ready function to update parameter vector 
     //      given current loss function values
     let unfoldLossFunc 
-                (lossFunc:list<float>->float) 
-                (currentParams:list<float>, currentLoss:float) = 
-        let dParams = dParam_dLoss lossFunc currentParams
-        let updatedParams = 
-            (currentParams, 
-                dParams |> List.map ((*) rate)) 
-                ||> List.map2 (-)
-        let updatedLoss = lossFunc updatedParams
-#if PRINT_UNFOLD_UPDATES
-        printfn "updated params = %A (%A %%), loss = %f" 
-            updatedParams 
-            ((updatedParams, currentParams)
-                ||> List.map2 
-                    (fun updatedEl currentEl 
-                        -> 100.0 * abs(updatedEl - currentEl)/(delta + abs(currentEl))))
-            updatedLoss 
-#endif
-        if abs(updatedLoss - currentLoss) < 0.5
-        then None
-        else Some ((updatedParams, updatedLoss), (updatedParams, updatedLoss))
+                (lossFunc:LossFunction) 
+                (currentParams:OptimizerParameters, currentLoss:float) =         
+        (currentParams, 
+            currentParams
+            |> dLoss_dParam lossFunc 
+            |> List.map (fun g -> rate / g))
+            ||> List.map2 (-)                
+            |> dump "updated params"
+            |> function
+                updatedParams -> 
+                    updatedParams
+                        |> (percentDifference currentParams) 
+                        |> (dump "difference %") |> ignore
+                    updatedParams
+                    |> lossFunc
+                    |> dump "updated loss"
+                    |> function 
+                        updatedLoss ->                            
+                            if 0.5 < abs(updatedLoss - currentLoss)
+                            then Some ((updatedParams, updatedLoss), 
+                                        (updatedParams, updatedLoss))
+                            else None
 
     // unfold operation on the loss function, starting from the initial parameters
-    let optimize (lossFunc:list<float>->float) (initParams:list<float>) = 
+    let optimize (lossFunc:LossFunction) (initParams:OptimizerParameters) = 
         Seq.unfold (unfoldLossFunc lossFunc) (initParams, lossFunc initParams)
         |> List.ofSeq
         |> List.last

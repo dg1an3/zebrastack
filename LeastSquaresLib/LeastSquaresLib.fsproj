@@ -9,9 +9,16 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Include="Issues.fsx" />
+    <Compile Include="VectorND.fs" />
     <Compile Include="Helper.fs" />
-    <Compile Include="SlopeInterceptObjective.fs" />
     <Compile Include="LeastSqOptimizer.fs" />
+    <Compile Include="SlopeInterceptObjective.fs" />
+    <Compile Include="ImageFilters.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="SixLabors.ImageSharp" Version="1.0.0-beta0005" />
   </ItemGroup>
 
 </Project>
