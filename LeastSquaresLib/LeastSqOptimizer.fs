@@ -30,7 +30,7 @@ module LeastSqOptimizer =
         else x + 0.1
 
     // delta parameter controls numerical approximation of gradient
-    let delta = 0.1
+    let delta = 0.01
 
     // gradient of loss function with respect to parameter vector
     let dLoss_dParam
@@ -53,7 +53,7 @@ module LeastSqOptimizer =
         |> List.ofSeq
 
     // update rate determines how much each update pulls the parameters
-    let rate = 0.95
+    let rate = 0.99
 
     let percentDifference previous updated = 
         (previous, updated)
