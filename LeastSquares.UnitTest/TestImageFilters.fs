@@ -6,6 +6,8 @@ open Microsoft.VisualStudio.TestTools.UnitTesting
 open LeastSquaresLib.Helper
 open LeastSquaresLib.VectorND
 open LeastSquaresLib.ImageFilters
+open LeastSquaresLib.ImageOptimization
+open LeastSquaresLib.ImageIO
 
 [<TestClass>]
 type TestImageFilters() =
@@ -75,14 +77,11 @@ type TestImageFilters() =
 
     [<TestMethod>]
     member __.TestMatchReconstruct() =
-        "..\..\..\..\..\teapot.jpg"
-        |> loadImageAsSignal
-        |> imageFromSignal
-        |> ((convolve 2 (gauss 0.5)) >> decimate)
-        |> ((convolve 2 (gauss 0.5)) >> decimate)
+        circle 5
+        |> (convolve 2 (gauss 0.5))
         |> function
             downsampled -> 
-                matchReconstruct (200/4) downsampled
+                matchReconstruct 10 downsampled
         |> asciiImage 60
         |> function _ -> true
         |> Assert.IsTrue

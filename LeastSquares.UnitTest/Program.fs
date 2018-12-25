@@ -2,6 +2,9 @@ module Program
 
 open LeastSquares.UnitTest
 open LeastSquaresLib.ImageFilters
+open LeastSquaresLib.ImageOptimization
+open LeastSquaresLib.ImageIO
+
 
 let [<EntryPoint>] main _ = 
 
