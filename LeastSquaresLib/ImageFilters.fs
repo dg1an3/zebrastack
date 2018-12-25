@@ -76,12 +76,11 @@ module ImageFilters =
     let gaussBasisReconstruct (imageAsSignal:ImageAsSignal) : ImageFunc =
         imageAsSignal
         |> imageFromSignal
-        |> expand
-        |> expand
-        |> convolve 2 (gauss 2.0)
+        // |> convolve 2 (gauss 2.0)
+        // |> expand
 
     let matchReconstruct width inImage : ImageFunc =
-        let inputWidth = width/4
+        let inputWidth = width//2
         let reconstruct (fromSignal:OptimizerParameters) = 
             { signal = fromSignal |> Array.ofList |> VectorND;
                 width = inputWidth }

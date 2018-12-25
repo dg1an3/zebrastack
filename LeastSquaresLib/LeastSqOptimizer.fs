@@ -83,7 +83,7 @@ module LeastSqOptimizer =
                     |> dump "updated loss"
                     |> function 
                         updatedLoss ->                            
-                            if 0.5 < abs(updatedLoss - currentLoss)
+                            if 0.1 < abs(updatedLoss - currentLoss)
                             then Some ((updatedParams, updatedLoss), 
                                         (updatedParams, updatedLoss))
                             else None

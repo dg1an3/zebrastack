@@ -4,17 +4,13 @@ open LeastSquares.UnitTest
 open LeastSquaresLib.ImageFilters
 
 let [<EntryPoint>] main _ = 
-    
-    @"..\..\..\..\..\teapot.jpg"
-    |> loadImageAsSignal
-    |> imageFromSignal
-    |> ((convolve 2 (gauss 0.5)) >> decimate)
-    |> ((convolve 2 (gauss 0.5)) >> decimate)
-    |> asciiImage 30
+
+    circle 5
+    |> asciiImage 10
     |> function
-        downsampled -> 
-            matchReconstruct (200/4) downsampled
-    |> asciiImage 60
+        imgCircle -> 
+            matchReconstruct 16 imgCircle
+    |> asciiImage 16
     |> ignore
 
     //let test = TestLeastSqOptimizer()
