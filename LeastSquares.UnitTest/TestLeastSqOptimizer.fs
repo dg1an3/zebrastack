@@ -74,6 +74,38 @@ type TestLeastSqOptimizer() =
             ||> List.forall2 (fun g sg -> abs(g) < abs(sg))
             |> Assert.IsTrue
             
+
+    [<TestMethod>]
+    member __.TestDirectOptimization() =      
+
+        let target = 
+            [| 0.0; 3.0; 5.0; -2.0; |] 
+            |> VectorND
+            |> dump "target"
+
+        let iter0 = 
+            genRandomVector (-5.0, 5.0) 4
+            |> dump "iter0"
+
+        let directFromParams param = 
+            param |> Array.ofList |> VectorND
+
+        iter0.values
+        |> List.ofArray
+        |> optimize (quadraticLoss target directFromParams)
+        |> function
+            (finalParams, finalLoss) ->                
+                printfn "final: params = %A; value = %A; loss = %f" 
+                        finalParams
+                        (directFromParams finalParams)
+                        finalLoss
+                let initLoss = 
+                    quadraticLoss target 
+                        directFromParams
+                        (iter0.values |> List.ofArray)
+                finalLoss < initLoss
+        |> Assert.IsTrue
+
     [<TestMethod>]
     member __.TestSlopeInterceptOptimization() =      
 
@@ -83,7 +115,7 @@ type TestLeastSqOptimizer() =
             |> dump "target"
 
         let iter0 = 
-            genRandomVector (0.0, 10.0) 4
+            genRandomVector (-5.0, 5.0) 4
             |> dump "iter0"
 
         let initSlope = 1.0

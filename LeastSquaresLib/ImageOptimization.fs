@@ -32,19 +32,22 @@ module ImageOptimization =
         // |> expand
 
     let matchReconstruct width inImage : ImageFunc =
-        let inputWidth = width//2
         let reconstruct (fromSignal:OptimizerParameters) = 
-            { signal = fromSignal |> Array.ofList |> VectorND;
-                width = inputWidth }
-            |> gaussBasisReconstruct
-            |> imageToSignal width
+            let signal = 
+                { signal = fromSignal |> Array.ofList |> VectorND;
+                    width = width }
+            signal 
+            |> imageFromSignal
+            // |> asciiImage 10
+            |> ignore
+            signal
 
         let reconstructSignal (fromSignal:OptimizerParameters) = 
             (reconstruct fromSignal).signal
 
         let { signal=inAsSignal } = imageToSignal width inImage
 
-        (genRandomVector (0.0,1.0) (inputWidth*inputWidth)).values
+        (genRandomVector (0.0,1.0) (width*width)).values
         |> List.ofArray
         |> optimize (quadraticLoss inAsSignal reconstructSignal)
         |> function
