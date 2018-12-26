@@ -35,14 +35,6 @@ type TestLeastSqOptimizer() =
         Assert.IsTrue(abs(loss) < 1e-8)
 
     [<TestMethod>]
-    member __.TestStabilize() =
-        let randomArray = genRandomVector (-0.1, 0.1) 100
-        let checkStabilizeSign = 
-            randomArray.values
-            |> Array.forall (fun x -> sign(x) = sign(stabilize x))    
-        Assert.IsTrue(checkStabilizeSign)
-
-    [<TestMethod>]
     member __.TestdLoss_dParam() = 
         let target = 
             [| 0.0; 3.0; 5.0; -2.0; |] 

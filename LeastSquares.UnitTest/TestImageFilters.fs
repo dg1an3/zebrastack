@@ -45,40 +45,27 @@ type TestImageFilters() =
         |> compareImageFuncs 10 (circle 5)
         |> Assert.IsTrue
 
-
-    [<TestMethod>]
-    member __.TestReconstruction() =
-
-        { width = 3;
-            signal = 
-                VectorND(
-                    [|0.0;0.5;1.0;
-                        0.5;1.0;1.5;
-                        0.0;0.5;1.0|] )}
-        |> gaussBasisReconstruct
-        |> asciiImage 20
-        |> ignore
-        Assert.IsTrue(true)
-
     [<TestMethod>]
     member __.TestPyramid() =      
 
-        "..\..\..\..\..\skull.jpg"
-        |> loadImageAsSignal 
-        |> imageFromSignal 
-        |> ((convolve 2 (gauss 0.5)) >> decimate)
-        |> ((convolve 2 (gauss 0.5)) >> decimate)
-        |> ((convolve 2 (gauss 0.5)) >> decimate)
+        //"..\..\..\..\..\..\MLData\skull.jpg"
+        //|> loadImageAsSignal 
+        //|> imageFromSignal
+        circle 5
+        |> shift -10 -10
+        |> ((convolve 2 (gauss 1.0)) >> decimate)
+        |> ((convolve 2 (gauss 1.0)) >> decimate)
+        |> ((convolve 2 (gauss 1.0)) >> decimate)
         |> asciiImage 60 
         |> function
             level3 -> (level3 0 0) >= 0.0
         |> Assert.IsTrue
 
-
     [<TestMethod>]
     member __.TestMatchReconstruct() =
         circle 5
         |> (convolve 2 (gauss 0.5))
+        |> shift -5 -5
         |> function
             downsampled -> 
                 matchReconstruct 10 downsampled

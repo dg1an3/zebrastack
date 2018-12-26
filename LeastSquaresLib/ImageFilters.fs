@@ -23,11 +23,14 @@ module ImageFilters =
     let parab x y = float (x*x + y*y)
 
     (* decimate operator *)
-    let decimate image = fun x y -> (image (x*2) (y*2))
+    let decimate image x y = image (x*2) (y*2)
 
     (* expand operator *)
-    let expand image = fun x y -> (image (x/2) (y/2))
+    let expand image x y = image (x/2) (y/2)
         
+    (* shift operator *)
+    let shift sx sy imageFunc x y = imageFunc (x+sx) (y+sy)
+
     (* convolve operator *)
     let convolve kSize (kernel:ImageFunc) (image:ImageFunc) x y =
         (seq {-kSize..kSize}, seq {-kSize..kSize})
