@@ -49,7 +49,7 @@ module ImageOptimization =
                 |> List.iter (printfn "%s")        
                 image
             let signal = 
-                { signal = fromSignal |> Array.ofList |> VectorND;
+                { signal = fromSignal;
                     width = width }
             signal 
             |> imageFromSignal
@@ -63,8 +63,7 @@ module ImageOptimization =
 
         let { signal=inAsSignal } = imageToSignal width inImage
 
-        (genRandomVector (-1.0,1.0) (width*width)).values
-        |> List.ofArray
+        genRandomVector (-1.0,1.0) (width*width)
         |> optimize (quadraticLoss inAsSignal reconstructSignal)
         |> function
             (finalSignal, finalLoss) -> 

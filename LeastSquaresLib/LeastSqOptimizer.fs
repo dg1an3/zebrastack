@@ -7,7 +7,7 @@ module LeastSqOptimizer =
 
     // TODO: define some types
     type SignalType = VectorND
-    type OptimizerParameters = list<float>
+    type OptimizerParameters = VectorND
 
     type LossFunction = OptimizerParameters->float
 
@@ -30,19 +30,21 @@ module LeastSqOptimizer =
                 (lossFunc:LossFunction) 
                 (atParams:OptimizerParameters) : OptimizerParameters =
         let loss = lossFunc atParams
-        atParams
-        |> Seq.mapi
+        atParams.values
+        |> Array.mapi
             (fun outer _
-                -> atParams
-                |> List.mapi 
+                -> atParams.values
+                |> Array.mapi 
                     (fun inner el 
                         -> if (inner = outer) 
                             then el+delta 
                             else el))
+        |> Seq.map VectorND
         |> Seq.map lossFunc
         |> Seq.map ((+) -loss)
         |> Seq.map ((*) (1.0/delta))
-        |> List.ofSeq
+        |> Array.ofSeq
+        |> VectorND
 
     // update rate determines how much each update pulls the parameters
     let rate = 0.25
@@ -65,9 +67,10 @@ module LeastSqOptimizer =
             |> dLoss_dParam lossFunc
 
         let updatedParams = 
-            (currentParams, 
-                gradient)
-            ||> List.map2 (fun currEl gradEl -> currEl - rate * gradEl)
+            (currentParams.values, 
+                gradient.values)
+            ||> Array.map2 (fun currEl gradEl -> currEl - rate * gradEl)
+            |> VectorND
 
         let updatedLoss = 
             updatedParams 

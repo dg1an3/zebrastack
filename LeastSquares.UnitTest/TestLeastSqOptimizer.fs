@@ -23,13 +23,11 @@ type TestLeastSqOptimizer() =
 
         // generate parameters = target
         let currentParams = 
-            target.values 
-            |> List.ofArray
+            target
             |> dump "current params"
 
-        let currentFunc forParams = forParams |> Array.ofList |> VectorND
         let loss = 
-            quadraticLoss target currentFunc currentParams
+            quadraticLoss target id currentParams
             |> dump "loss"
         
         Assert.IsTrue(abs(loss) < 1e-8)
@@ -41,48 +39,36 @@ type TestLeastSqOptimizer() =
             |> VectorND
             |> dump "target"
 
-        // parameter function that just turns the parameter vector directly in to a VectorND
-        let paramsToSignal forParams = 
-            forParams 
-            |> Array.ofSeq 
-            |> VectorND
-
         let approxGradOfShift shift = 
             target.values 
-            |> List.ofArray
-            |> List.map ((+) shift)
+            |> Array.map ((+) shift)
+            |> VectorND
             |> dump "params"
-            |> dLoss_dParam (quadraticLoss target paramsToSignal)
+            |> dLoss_dParam (quadraticLoss target id)
             |> dump "grad"
             
         let exactGradOfShift shift =
             target.values
-            |> List.ofArray
-            |> List.map (fun _ -> 2.0 * shift)
+            |> Array.map (fun _ -> 2.0 * shift)
+            |> VectorND
 
-        (exactGradOfShift 0.0, 
-            approxGradOfShift 0.0)
-            ||> List.forall2 (fun l r -> abs(l-r) < 1e-6)
+        [ 0.0; -5.0; 10.0 ]
+        |> List.map 
+            (fun shift ->
+                ((exactGradOfShift shift).values, 
+                    (approxGradOfShift shift).values)
+                    ||> Array.forall2 (fun l r -> abs(l-r) < 1e-6))
+        |> List.forall id
+        |> Assert.IsTrue
+                    
+        ((approxGradOfShift 0.0).values, 
+            (approxGradOfShift 5.0).values) 
+            ||> Array.forall2 (fun g sg -> abs(g) < abs(sg))
             |> Assert.IsTrue
 
-        (exactGradOfShift -5.0, 
-            approxGradOfShift -5.0)
-            ||> List.forall2 (fun l r -> abs(l-r) < 1e-6)
-            |> Assert.IsTrue
-
-        (exactGradOfShift 10.0, 
-            approxGradOfShift 10.0)
-            ||> List.forall2 (fun l r -> abs(l-r) < 1e-6)
-            |> Assert.IsTrue
-
-        (approxGradOfShift 0.0, 
-            approxGradOfShift 5.0) 
-            ||> List.forall2 (fun g sg -> abs(g) < abs(sg))
-            |> Assert.IsTrue
-
-        (approxGradOfShift -5.0, 
-            approxGradOfShift -10.0) 
-            ||> List.forall2 (fun g sg -> abs(g) < abs(sg))
+        ((approxGradOfShift -5.0).values, 
+            (approxGradOfShift -10.0).values) 
+            ||> Array.forall2 (fun g sg -> abs(g) < abs(sg))
             |> Assert.IsTrue
             
 
@@ -98,22 +84,18 @@ type TestLeastSqOptimizer() =
             genRandomVector (-5.0, 5.0) 4
             |> dump "iter0"
 
-        let directFromParams param = 
-            param |> Array.ofList |> VectorND
-
-        iter0.values
-        |> List.ofArray
-        |> optimize (quadraticLoss target directFromParams)
+        iter0
+        |> optimize (quadraticLoss target id)
         |> function
             (finalParams, finalLoss) ->                
                 printfn "final: params = %A; value = %A; loss = %f" 
                         finalParams
-                        (directFromParams finalParams)
+                        finalParams
                         finalLoss
                 let initLoss = 
                     quadraticLoss target 
-                        directFromParams
-                        (iter0.values |> List.ofArray)
+                        id
+                        iter0
                 finalLoss < initLoss
         |> Assert.IsTrue
 
@@ -132,17 +114,19 @@ type TestLeastSqOptimizer() =
         let initSlope = 1.0
         let initOffset = 0.0
 
-        [initSlope; initOffset]
+        [| initSlope; initOffset |]
+        |> VectorND
         |> optimize (quadraticLoss target (currentFromSlopeOffset iter0))
         |> function
-            ([finalSlope; finalOffset], finalLoss) ->                
+            (finalParams, finalLoss) ->    
+                let [|finalSlope; finalOffset|] = finalParams.values
                 printfn "final: slope = %f; offset = %f; value = %A; loss = %f" 
                         finalSlope finalOffset
-                        (currentFromSlopeOffset iter0 [finalSlope; finalOffset])
+                        (currentFromSlopeOffset iter0 finalParams)
                         finalLoss
                 let initLoss = 
                     quadraticLoss target 
                         (currentFromSlopeOffset iter0) 
-                        [initSlope; initOffset]
+                        ([| initSlope; initOffset |] |> VectorND)
                 finalLoss < initLoss
         |> Assert.IsTrue
