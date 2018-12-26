@@ -55,22 +55,41 @@ type TestLeastSqOptimizer() =
             |> Array.ofSeq 
             |> VectorND
 
-        let gradOfShift shift = 
+        let approxGradOfShift shift = 
             target.values 
             |> List.ofArray
             |> List.map ((+) shift)
             |> dump "params"
             |> dLoss_dParam (quadraticLoss target paramsToSignal)
             |> dump "grad"
+            
+        let exactGradOfShift shift =
+            target.values
+            |> List.ofArray
+            |> List.map (fun _ -> 2.0 * shift)
 
-        let gradOfShift0, gradOfShift5, gradOfShift10 =
-            (gradOfShift 0.0, gradOfShift 5.0, gradOfShift 10.0)
+        (exactGradOfShift 0.0, 
+            approxGradOfShift 0.0)
+            ||> List.forall2 (fun l r -> abs(l-r) < 1e-6)
+            |> Assert.IsTrue
 
-        (gradOfShift0, gradOfShift5) 
+        (exactGradOfShift -5.0, 
+            approxGradOfShift -5.0)
+            ||> List.forall2 (fun l r -> abs(l-r) < 1e-6)
+            |> Assert.IsTrue
+
+        (exactGradOfShift 10.0, 
+            approxGradOfShift 10.0)
+            ||> List.forall2 (fun l r -> abs(l-r) < 1e-6)
+            |> Assert.IsTrue
+
+        (approxGradOfShift 0.0, 
+            approxGradOfShift 5.0) 
             ||> List.forall2 (fun g sg -> abs(g) < abs(sg))
             |> Assert.IsTrue
 
-        (gradOfShift5, gradOfShift10) 
+        (approxGradOfShift -5.0, 
+            approxGradOfShift -10.0) 
             ||> List.forall2 (fun g sg -> abs(g) < abs(sg))
             |> Assert.IsTrue
             

@@ -25,12 +25,16 @@ module LeastSqOptimizer =
     // ensures value x does not get too small (absolute value),
     //      while maintaining its sign
     let stabilize x =
+        if abs(x) < 1e-8 
+        then printf "x = %f" x
+        else ()
+
         if x < 0.0
-        then x - 0.1
-        else x + 0.1
+        then x // - 1e-6
+        else x // + 1e-6
 
     // delta parameter controls numerical approximation of gradient
-    let delta = 0.1
+    let delta = 0.0000001
 
     // gradient of loss function with respect to parameter vector
     let dLoss_dParam
@@ -48,12 +52,11 @@ module LeastSqOptimizer =
                             else el))
         |> Seq.map lossFunc
         |> Seq.map ((+) -loss)
-        |> Seq.map stabilize
         |> Seq.map ((*) (1.0/delta))
         |> List.ofSeq
 
     // update rate determines how much each update pulls the parameters
-    let rate = 1.00
+    let rate = 0.8
 
     let percentDifference previous updated = 
         (previous, updated)
@@ -66,27 +69,30 @@ module LeastSqOptimizer =
     //      given current loss function values
     let unfoldLossFunc 
                 (lossFunc:LossFunction) 
-                (currentParams:OptimizerParameters, currentLoss:float) =         
-        (currentParams, 
-            currentParams
-            |> dLoss_dParam lossFunc 
-            |> List.map (fun g -> rate / g))
-            ||> List.map2 (-)                
-            |> dump "updated params"
-            |> function
-                updatedParams -> 
-                    updatedParams
-                        |> (percentDifference currentParams) 
-                        |> (dump "difference %") |> ignore
-                    updatedParams
-                    |> lossFunc
-                    |> dump "updated loss"
-                    |> function 
-                        updatedLoss ->                            
-                            if 0.5 < abs(updatedLoss - currentLoss)
-                            then Some ((updatedParams, updatedLoss), 
-                                        (updatedParams, updatedLoss))
-                            else None
+                (currentParams:OptimizerParameters, currentLoss:float) =    
+            
+        let grad = currentParams |> dLoss_dParam lossFunc
+        let invGrad = grad |> List.map (fun g -> rate * g)
+        let updatedParams = 
+            (currentParams, 
+                invGrad)
+            ||> List.map2 (fun curr invG -> curr - invG)
+
+        let updatedLoss = updatedParams |> lossFunc
+
+        if (updatedLoss > currentLoss)
+        then printf "what happened? %f" currentLoss
+        else ()
+
+        updatedParams
+        |> lossFunc
+        |> dump "updated loss"
+        |> function 
+            updatedLoss ->                            
+                if 0.5 < abs(updatedLoss - currentLoss)
+                then Some ((updatedParams, updatedLoss), 
+                            (updatedParams, updatedLoss))
+                else None
 
     // unfold operation on the loss function, starting from the initial parameters
     let optimize (lossFunc:LossFunction) (initParams:OptimizerParameters) = 
