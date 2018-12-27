@@ -5,6 +5,7 @@ module ImageOptimization =
     open LeastSquaresLib.ImageFilters
     open LeastSquaresLib.LeastSqOptimizer
     open LeastSquaresLib.VectorND
+    open LeastSquaresLib.ImageVector
 
     let matchReconstruct useSparsity width inImage : ImageFunc =
         let reconstruct (fromSignal:OptimizerParameters) = 

@@ -4,6 +4,7 @@ open System
 open Microsoft.VisualStudio.TestTools.UnitTesting
 
 open LeastSquaresLib.Helper
+open LeastSquaresLib.AsciiGraph
 open LeastSquaresLib.VectorND
 open LeastSquaresLib.ImageFilters
 open LeastSquaresLib.ImageOptimization
@@ -11,6 +12,12 @@ open LeastSquaresLib.ImageIO
 
 [<TestClass>]
 type TestImageFilters() =
+
+    let dumpImage range image =
+        image
+        |> asciiImage (seq{0..range})
+        |> Seq.iter (printfn "%s")
+        image
 
     let compareImageFuncs range funcLeft funcRight =
         (seq{-range..range}, seq{-range..range})
@@ -36,12 +43,12 @@ type TestImageFilters() =
     [<TestMethod>]
     member __.TestExpandDecimate() =
         circle 5
-        |> expand |> asciiImage 20
-        |> expand |> asciiImage 20
-        |> expand |> asciiImage 20
-        |> decimate |> asciiImage 20
-        |> decimate |> asciiImage 20
-        |> decimate |> asciiImage 20
+        |> expand |> dumpImage 20
+        |> expand |> dumpImage 20
+        |> expand |> dumpImage 20
+        |> decimate |> dumpImage 20
+        |> decimate |> dumpImage 20
+        |> decimate |> dumpImage 20
         |> compareImageFuncs 10 (circle 5)
         |> Assert.IsTrue
 
@@ -56,7 +63,7 @@ type TestImageFilters() =
         |> ((convolve 2 (gauss 1.0)) >> decimate)
         |> ((convolve 2 (gauss 1.0)) >> decimate)
         |> ((convolve 2 (gauss 1.0)) >> decimate)
-        |> asciiImage 60 
+        |> dumpImage 60
         |> function
             level3 -> (level3 0 0) >= 0.0
         |> Assert.IsTrue
@@ -67,6 +74,6 @@ type TestImageFilters() =
         |> (convolve 2 (gauss 0.5))
         |> shift -5 -5
         |> matchReconstruct false 10
-        |> asciiImage 60
+        |> dumpImage 60
         |> function _ -> true
         |> Assert.IsTrue

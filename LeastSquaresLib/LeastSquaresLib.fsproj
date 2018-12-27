@@ -10,11 +10,13 @@
 
   <ItemGroup>
     <None Include="Issues.fsx" />
+    <Compile Include="AsciiGraph.fs" />
     <Compile Include="VectorND.fs" />
     <Compile Include="Helper.fs" />
     <Compile Include="LeastSqOptimizer.fs" />
     <Compile Include="SlopeInterceptObjective.fs" />
     <Compile Include="ImageFilters.fs" />
+    <Compile Include="ImageVector.fs" />
     <Compile Include="ImageOptimization.fs" />
     <Compile Include="ImageIO.fs" />
   </ItemGroup>
