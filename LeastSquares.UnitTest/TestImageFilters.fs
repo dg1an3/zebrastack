@@ -66,9 +66,7 @@ type TestImageFilters() =
         circle 5
         |> (convolve 2 (gauss 0.5))
         |> shift -5 -5
-        |> function
-            downsampled -> 
-                matchReconstruct 10 downsampled
+        |> matchReconstruct false 10
         |> asciiImage 60
         |> function _ -> true
         |> Assert.IsTrue

@@ -11,9 +11,7 @@ let [<EntryPoint>] main _ =
     circle 5
     |> shift -5 -5
     |> asciiImage 10
-    |> function
-        imgCircle -> 
-            matchReconstruct 16 imgCircle
+    |> matchReconstruct false 16
     |> asciiImage 16
     |> ignore
 

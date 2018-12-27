@@ -27,8 +27,8 @@ module VectorND =
             ||> Array.map2 (*) 
             |> Array.sum
 
-    let normL2 v = v * v
-    let normL1 = normL2 >> sqrt
+    let normL2 (v:VectorND) = v * v
+    let normL1 (v:VectorND) = v |> normL2 |> sqrt
     let normL0 (v:VectorND) = 
         v.values 
         |> Array.filter ((<>) 0.0) 
