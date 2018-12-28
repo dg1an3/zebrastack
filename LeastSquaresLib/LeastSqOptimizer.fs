@@ -15,16 +15,16 @@ module LeastSqOptimizer =
     //      * target as array of float
     //      * evaluation of currentFunc at params
     let quadraticLoss 
-                (useSparsity:bool)
+                (sparsityPenalty:OptimizerParameters->float) 
                 (target:SignalType) 
                 (currentFunc:OptimizerParameters->SignalType) 
                 (forParams:OptimizerParameters) =
         currentFunc forParams
         |> (-) target
         |> normL2
-        |> (+) (if useSparsity 
-                then normL2 forParams
-                else 0.0)
+        |> (+) (sparsityPenalty forParams)
+
+    let nullSparsityPenalty (_:OptimizerParameters) = 0.0
 
     // delta parameter controls numerical approximation of gradient
     let delta = 1e-7

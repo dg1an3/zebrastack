@@ -2,9 +2,11 @@ module Program
 
 open LeastSquares.UnitTest
 open LeastSquaresLib.AsciiGraph
+open LeastSquaresLib.LeastSqOptimizer
 open LeastSquaresLib.ImageFilters
 open LeastSquaresLib.ImageOptimization
 open LeastSquaresLib.ImageIO
+
 
 
 let [<EntryPoint>] main _ = 
@@ -16,7 +18,8 @@ let [<EntryPoint>] main _ =
             image
             |> asciiImage (seq{0..10}) 
             |> Seq.iter (printfn "%s")
-            image    |> matchReconstruct false 16
+            image    
+            |> matchReconstruct nullSparsityPenalty 16
     |> function 
         image -> 
             image

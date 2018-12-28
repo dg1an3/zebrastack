@@ -27,7 +27,7 @@ type TestLeastSqOptimizer() =
             |> dump "current params"
 
         let loss = 
-            quadraticLoss false target id currentParams
+            quadraticLoss nullSparsityPenalty target id currentParams
             |> dump "loss"
         
         Assert.IsTrue(abs(loss) < 1e-8)
@@ -44,7 +44,7 @@ type TestLeastSqOptimizer() =
             |> Array.map ((+) shift)
             |> VectorND
             |> dump "params"
-            |> dLoss_dParam (quadraticLoss false target id)
+            |> dLoss_dParam (quadraticLoss nullSparsityPenalty target id)
             |> dump "grad"
             
         let exactGradOfShift shift =
@@ -85,7 +85,7 @@ type TestLeastSqOptimizer() =
             |> dump "iter0"
 
         iter0
-        |> optimize (quadraticLoss false target id)
+        |> optimize (quadraticLoss nullSparsityPenalty target id)
         |> function
             (finalParams, finalLoss) ->                
                 printfn "final: params = %A; value = %A; loss = %f" 
@@ -93,7 +93,7 @@ type TestLeastSqOptimizer() =
                         finalParams
                         finalLoss
                 let initLoss = 
-                    quadraticLoss false target id iter0
+                    quadraticLoss nullSparsityPenalty target id iter0
                 finalLoss < initLoss
         |> Assert.IsTrue
 
@@ -114,7 +114,7 @@ type TestLeastSqOptimizer() =
 
         [| initSlope; initOffset |]
         |> VectorND
-        |> optimize (quadraticLoss false target (currentFromSlopeOffset iter0))
+        |> optimize (quadraticLoss nullSparsityPenalty target (currentFromSlopeOffset iter0))
         |> function
             (finalParams, finalLoss) ->    
                 let [|finalSlope; finalOffset|] = finalParams.values
@@ -123,7 +123,7 @@ type TestLeastSqOptimizer() =
                         (currentFromSlopeOffset iter0 finalParams)
                         finalLoss
                 let initLoss = 
-                    quadraticLoss false target (currentFromSlopeOffset iter0) 
+                    quadraticLoss nullSparsityPenalty target (currentFromSlopeOffset iter0) 
                         ([| initSlope; initOffset |] |> VectorND)
                 finalLoss < initLoss
         |> Assert.IsTrue

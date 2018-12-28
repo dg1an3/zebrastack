@@ -6,9 +6,11 @@ open Microsoft.VisualStudio.TestTools.UnitTesting
 open LeastSquaresLib.Helper
 open LeastSquaresLib.AsciiGraph
 open LeastSquaresLib.VectorND
+open LeastSquaresLib.LeastSqOptimizer
 open LeastSquaresLib.ImageFilters
 open LeastSquaresLib.ImageOptimization
 open LeastSquaresLib.ImageIO
+
 
 [<TestClass>]
 type TestImageFilters() =
@@ -73,7 +75,7 @@ type TestImageFilters() =
         circle 5
         |> (convolve 2 (gauss 0.5))
         |> shift -5 -5
-        |> matchReconstruct false 10
+        |> matchReconstruct nullSparsityPenalty 10
         |> dumpImage 60
         |> function _ -> true
         |> Assert.IsTrue
