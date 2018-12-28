@@ -2,9 +2,15 @@
 
 module VectorND =
 
+    [<StructuredFormatDisplay("Ascii")>]
     type VectorND(values:float[]) =
         member this.values = values
         member this.Item(n) = values.[n]
+        member this.Ascii = 
+            let (minValue,maxValue) =
+                (values |> Seq.min, values |> Seq.max)
+            values
+            |> AsciiGraph.asciiGraph (minValue, maxValue)
         override this.ToString() = sprintf "%A" values
         static member (+) (l:VectorND,r:VectorND) =
             (l.values,r.values) 

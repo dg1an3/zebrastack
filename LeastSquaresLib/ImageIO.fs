@@ -21,5 +21,5 @@ module ImageIO =
         |> Array.ofSeq
         |> VectorND
         |> function 
-            signal -> { width=width; signal=signal }
+            signal -> ImageVector(width, signal)
 

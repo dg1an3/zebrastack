@@ -10,9 +10,7 @@ module ImageOptimization =
     let matchReconstruct useSparsity width inImage : ImageFunc =
         let reconstruct (fromSignal:OptimizerParameters) = 
             
-            let signal = 
-                { signal = fromSignal;
-                    width = width }
+            let signal = ImageVector(width, fromSignal)
             signal.ImageFunc
             |> convolve 2 (gauss 1.0)
             // |> asciiImage 10
