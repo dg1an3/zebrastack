@@ -7,8 +7,8 @@ module ImageOptimization =
     open LeastSquaresLib.VectorND
     open LeastSquaresLib.ImageVector
 
-    let matchReconstruct useSparsity width inImage : ImageFunc =
-        let reconstruct (fromSignal:OptimizerParameters) = 
+    let matchReconstruct sparsityPenalty width inImage : ImageFunc =
+        let reconstruct (fromSignal:VectorND) = 
             
             let signal = ImageVector(width, fromSignal)
             signal.ImageFunc
@@ -17,13 +17,13 @@ module ImageOptimization =
             |> ignore
             signal
 
-        let reconstructSignal (fromSignal:OptimizerParameters) = 
+        let reconstructSignal (fromSignal:VectorND) = 
             (reconstruct fromSignal).signal
 
         let inAsSignal = (imageToSignal width inImage).signal
 
         genRandomVector (-1.0,1.0) (width*width)
-        |> optimize (quadraticLoss useSparsity inAsSignal reconstructSignal)
+        |> optimize (quadraticLoss sparsityPenalty inAsSignal reconstructSignal)
         |> function
             (finalSignal, finalLoss) -> 
                 (reconstruct finalSignal).ImageFunc

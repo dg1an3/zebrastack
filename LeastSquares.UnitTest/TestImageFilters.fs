@@ -8,8 +8,10 @@ open LeastSquaresLib.AsciiGraph
 open LeastSquaresLib.VectorND
 open LeastSquaresLib.LeastSqOptimizer
 open LeastSquaresLib.ImageFilters
+open LeastSquaresLib.ImageVector
 open LeastSquaresLib.ImageOptimization
 open LeastSquaresLib.ImageIO
+
 
 
 [<TestClass>]
@@ -63,9 +65,15 @@ type TestImageFilters() =
         circle 5
         |> shift -10 -10
         |> ((convolve 2 (gauss 1.0)) >> decimate)
+        |> imageToSignal 10
+        |> imageFunc
         |> ((convolve 2 (gauss 1.0)) >> decimate)
+        |> imageToSignal 5
+        |> imageFunc
         |> ((convolve 2 (gauss 1.0)) >> decimate)
-        |> dumpImage 60
+        |> imageToSignal 3
+        |> imageFunc
+        |> dumpImage 10
         |> function
             level3 -> (level3 0 0) >= 0.0
         |> Assert.IsTrue

@@ -5,26 +5,22 @@ module LeastSqOptimizer =
     open LeastSquaresLib.Helper
     open LeastSquaresLib.VectorND
 
-    // TODO: define some types
-    type SignalType = VectorND
-    type OptimizerParameters = VectorND
-
-    type LossFunction = OptimizerParameters->float
+    type LossFunction = VectorND->float
 
     // calculate quadratic loss between
     //      * target as array of float
     //      * evaluation of currentFunc at params
     let quadraticLoss 
-                (sparsityPenalty:OptimizerParameters->float) 
-                (target:SignalType) 
-                (currentFunc:OptimizerParameters->SignalType) 
-                (forParams:OptimizerParameters) =
+                (sparsityPenalty:VectorND->float) 
+                (target:VectorND) 
+                (currentFunc:VectorND->VectorND) 
+                (forParams:VectorND) =
         currentFunc forParams
         |> (-) target
         |> normL2
         |> (+) (sparsityPenalty forParams)
 
-    let nullSparsityPenalty (_:OptimizerParameters) = 0.0
+    let nullSparsityPenalty (_:VectorND) = 0.0
 
     // delta parameter controls numerical approximation of gradient
     let delta = 1e-7
@@ -32,7 +28,7 @@ module LeastSqOptimizer =
     // gradient of loss function with respect to parameter vector
     let dLoss_dParam
                 (lossFunc:LossFunction) 
-                (atParams:OptimizerParameters) : OptimizerParameters =
+                (atParams:VectorND) : VectorND =
         let loss = lossFunc atParams
         atParams.values
         |> Array.mapi
@@ -64,7 +60,7 @@ module LeastSqOptimizer =
     //      given current loss function values
     let unfoldLossFunc 
                 (lossFunc:LossFunction) 
-                (currentParams:OptimizerParameters, currentLoss:float) =    
+                (currentParams:VectorND, currentLoss:float) =    
             
         let gradient = 
             currentParams 
@@ -93,7 +89,7 @@ module LeastSqOptimizer =
                 else None
 
     // unfold operation on the loss function, starting from the initial parameters
-    let optimize (lossFunc:LossFunction) (initParams:OptimizerParameters) = 
+    let optimize (lossFunc:LossFunction) (initParams:VectorND) = 
         Seq.unfold (unfoldLossFunc lossFunc) (initParams, lossFunc initParams)
         |> List.ofSeq
         |> List.last
