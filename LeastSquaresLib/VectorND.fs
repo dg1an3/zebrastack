@@ -2,7 +2,7 @@
 
 module VectorND =
 
-    [<StructuredFormatDisplay("Ascii")>]
+    [<StructuredFormatDisplay("{Ascii}")>]
     type VectorND(values:float[]) =
         member this.values = values
         member this.Item(n) = values.[n]
