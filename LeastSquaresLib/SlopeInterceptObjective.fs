@@ -7,7 +7,7 @@ module SlopeInterceptObjective =
     // compute current value given current slope/intercept parameters
     let currentFromSlopeOffset (init:VectorND) (SlopeIntercept:VectorND) =
         let [| slope:float; offset:float |] = SlopeIntercept.values
-        init.values
-        |> Array.map ((*) slope)
-        |> Array.map ((+) offset)
-        |> VectorND
+        let ret = init.values
+                    |> Array.map (fun initEl -> initEl * slope + offset)
+                    |> VectorND
+        ret

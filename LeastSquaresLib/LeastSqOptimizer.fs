@@ -15,15 +15,16 @@ module LeastSqOptimizer =
                 (target:VectorND) 
                 (currentFunc:VectorND->VectorND) 
                 (forParams:VectorND) =
-        currentFunc forParams
-        |> (-) target
-        |> normL2
-        |> (+) (sparsityPenalty forParams)
+        let currentValue = 
+            currentFunc forParams
+        let quadLoss = normL2 (currentValue - target)
+        let quadLossAndSparsity = quadLoss + (sparsityPenalty forParams)
+        quadLossAndSparsity
 
     let nullSparsityPenalty (_:VectorND) = 0.0
 
     // delta parameter controls numerical approximation of gradient
-    let delta = 1e-7
+    let delta = 1e-3
 
     // gradient of loss function with respect to parameter vector
     let dLoss_dParam
@@ -40,6 +41,7 @@ module LeastSqOptimizer =
                             then el+delta 
                             else el))
         |> Seq.map VectorND
+        |> dump "deltas"
         |> Seq.map lossFunc
         |> Seq.map ((+) -loss)
         |> Seq.map ((*) (1.0/delta))
