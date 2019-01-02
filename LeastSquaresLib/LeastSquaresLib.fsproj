@@ -13,6 +13,7 @@
     <Compile Include="AsciiGraph.fs" />
     <Compile Include="VectorND.fs" />
     <Compile Include="Helper.fs" />
+    <Compile Include="NumericalGradient.fs" />
     <Compile Include="LeastSqOptimizer.fs" />
     <Compile Include="SlopeInterceptObjective.fs" />
     <Compile Include="ImageFilters.fs" />

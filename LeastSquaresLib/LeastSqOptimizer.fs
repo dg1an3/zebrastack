@@ -4,6 +4,7 @@ module LeastSqOptimizer =
 
     open LeastSquaresLib.Helper
     open LeastSquaresLib.VectorND
+    open LeastSquaresLib.NumericalGradient
 
     type LossFunction = VectorND->float
 
@@ -23,54 +24,22 @@ module LeastSqOptimizer =
 
     let nullSparsityPenalty (_:VectorND) = 0.0
 
-    // delta parameter controls numerical approximation of gradient
-    let delta = 1e-3
-
-    // gradient of loss function with respect to parameter vector
-    let dLoss_dParam
-                (lossFunc:LossFunction) 
-                (atParams:VectorND) : VectorND =
-        let loss = lossFunc atParams
-        atParams.values
-        |> Array.mapi
-            (fun outer _
-                -> atParams.values
-                |> Array.mapi 
-                    (fun inner el 
-                        -> if (inner = outer) 
-                            then el+delta 
-                            else el))
-        |> Seq.map VectorND
-        |> dump "deltas"
-        |> Seq.map lossFunc
-        |> Seq.map ((+) -loss)
-        |> Seq.map ((*) (1.0/delta))
-        |> Array.ofSeq
-        |> VectorND
-
     // update rate determines how much each update pulls the parameters
     let rate = 0.25
-
-    let percentDifference previous updated = 
-        (previous, updated)
-        ||> List.map2 
-            (fun updatedEl currentEl 
-                -> 100.0 * abs(updatedEl - currentEl)
-                    /(delta + abs(currentEl)))
-
+    
     // Seq.unfold-ready function to update parameter vector 
     //      given current loss function values
     let unfoldLossFunc 
                 (lossFunc:LossFunction) 
                 (currentParams:VectorND, currentLoss:float) =    
             
-        let gradient = 
+        let gradientAtCurrent = 
             currentParams 
-            |> dLoss_dParam lossFunc
+            |> gradient lossFunc
 
         let updatedParams = 
             (currentParams.values, 
-                gradient.values)
+                gradientAtCurrent.values)
             ||> Array.map2 (fun currEl gradEl -> currEl - rate * gradEl)
             |> VectorND
 

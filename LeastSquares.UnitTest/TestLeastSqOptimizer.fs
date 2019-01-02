@@ -5,11 +5,20 @@ open Microsoft.VisualStudio.TestTools.UnitTesting
 
 open LeastSquaresLib.Helper
 open LeastSquaresLib.VectorND
+open LeastSquaresLib.NumericalGradient
 open LeastSquaresLib.LeastSqOptimizer
 open LeastSquaresLib.SlopeInterceptObjective
 
 [<TestClass>]
 type TestLeastSqOptimizer() =
+
+    [<TestMethod>]
+    member __.TestNumericalGradient() =
+        let xSq (x:VectorND) = x.[0] * x.[0]       
+        gradient xSq
+
+        let dxSq_dx (x:VectorND) = 2.0 * x.[0]
+        true
 
     [<TestMethod>]
     member __.TestQuadraticLoss() = 
@@ -27,13 +36,14 @@ type TestLeastSqOptimizer() =
             |> dump "current params"
 
         let loss = 
-            quadraticLoss nullSparsityPenalty target id currentParams
+            currentParams
+            |> ((-) target >> normL2)
             |> dump "loss"
         
         Assert.IsTrue(abs(loss) < 1e-8)
 
     [<TestMethod>]
-    member __.TestdLoss_dParam() = 
+    member __.TestGradient() = 
         let target = 
             [| 0.0; 3.0; 5.0; -2.0; |] 
             |> VectorND
@@ -44,7 +54,7 @@ type TestLeastSqOptimizer() =
             |> Array.map ((+) shift)
             |> VectorND
             |> dump "params"
-            |> dLoss_dParam (quadraticLoss nullSparsityPenalty target id)
+            |> gradient ((-) target >> normL2)
             |> dump "grad"
             
         let exactGradOfShift shift =
@@ -85,7 +95,7 @@ type TestLeastSqOptimizer() =
             |> dump "iter0"
 
         iter0
-        |> optimize (quadraticLoss nullSparsityPenalty target id)
+        |> optimize ((-) target >> normL2)
         |> function
             (finalParams, finalLoss) ->                
                 printfn "final: params = %A; value = %A; loss = %f" 
