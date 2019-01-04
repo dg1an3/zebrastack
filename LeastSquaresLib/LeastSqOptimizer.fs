@@ -8,22 +8,6 @@ module LeastSqOptimizer =
 
     type LossFunction = VectorND->float
 
-    // calculate quadratic loss between
-    //      * target as array of float
-    //      * evaluation of currentFunc at params
-    let quadraticLoss 
-                (sparsityPenalty:VectorND->float) 
-                (target:VectorND) 
-                (currentFunc:VectorND->VectorND) 
-                (forParams:VectorND) =
-        let currentValue = 
-            currentFunc forParams
-        let quadLoss = normL2 (currentValue - target)
-        let quadLossAndSparsity = quadLoss + (sparsityPenalty forParams)
-        quadLossAndSparsity
-
-    let nullSparsityPenalty (_:VectorND) = 0.0
-
     // update rate determines how much each update pulls the parameters
     let rate = 0.25
     

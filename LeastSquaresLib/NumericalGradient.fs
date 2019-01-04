@@ -8,7 +8,7 @@ module NumericalGradient =
     type LossFunction = VectorND -> float
 
     // delta parameter controls numerical approximation of gradient
-    let delta = 1e-3
+    let delta = 1e-8
 
     // gradient of loss function with respect to parameter vector
     let gradient 
@@ -25,8 +25,7 @@ module NumericalGradient =
                         -> if (inner = outer) 
                             then el+delta 
                             else el))
-        |> Seq.map VectorND
-        |> dump "deltas"
+        |> Seq.map VectorND |> dump "deltas"
         |> Seq.map lossFunc
         |> Seq.map ((+) -loss)
         |> Seq.map ((*) (1.0/delta))

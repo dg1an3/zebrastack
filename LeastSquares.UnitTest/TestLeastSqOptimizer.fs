@@ -8,68 +8,68 @@ open LeastSquaresLib.VectorND
 open LeastSquaresLib.NumericalGradient
 open LeastSquaresLib.LeastSqOptimizer
 open LeastSquaresLib.SlopeInterceptObjective
+open SixLabors.ImageSharp.Processing
 
 [<TestClass>]
 type TestLeastSqOptimizer() =
 
+    let verySmall x = abs(x) < 1e-8
+
     [<TestMethod>]
     member __.TestNumericalGradient() =
-        let xSq (x:VectorND) = x.[0] * x.[0]       
-        gradient xSq
+        
+        let sq (x:VectorND) = x.[0] * x.[0]
 
-        let dxSq_dx (x:VectorND) = 2.0 * x.[0]
-        true
+        let dSq_dx (x:VectorND) = [| 2.0 * x.[0] |] |> VectorND 
+
+        let compareGradient x =
+            let input = [|x|] |> VectorND
+            let numerical = gradient sq input               |> dump "numerical"
+            let exact = dSq_dx input                        |> dump "exact"
+            normL2 (numerical - exact)
+            |> verySmall
+
+        [ -8.0; 1.0; 0.8 ]
+        |> List.map compareGradient
+        |> List.iter Assert.IsTrue
 
     [<TestMethod>]
     member __.TestQuadraticLoss() = 
 
         // random target
-        // TODO: use FsCheck to generate this at different lengths etc.
-        let target = 
-            [| 0.0; 3.0; 5.0; -2.0; |] 
-            |> VectorND
-            |> dump "target"
+        let target = [| 0.0; 3.0; 5.0; -2.0; |] |> VectorND     |> dump "target"
 
         // generate parameters = target
-        let currentParams = 
-            target
-            |> dump "current params"
+        let currentParams = target                      |> dump "current params"
 
-        let loss = 
-            currentParams
-            |> ((-) target >> normL2)
-            |> dump "loss"
-        
-        Assert.IsTrue(abs(loss) < 1e-8)
+        currentParams
+        |> ((-) target >> normL2)                               |> dump "loss"
+        |> verySmall
+        |> Assert.IsTrue
 
     [<TestMethod>]
     member __.TestGradient() = 
-        let target = 
-            [| 0.0; 3.0; 5.0; -2.0; |] 
-            |> VectorND
-            |> dump "target"
+        let target = [| 0.0; 3.0; 5.0; -2.0; |] |> VectorND     |> dump "target"
 
         let approxGradOfShift shift = 
-            target.values 
-            |> Array.map ((+) shift)
-            |> VectorND
-            |> dump "params"
-            |> gradient ((-) target >> normL2)
-            |> dump "grad"
+            Array.create 4 shift |> VectorND
+            |> ((+) target)                                     |> dump "params"
+            |> gradient (((-) target) >> normL2)                |> dump "grad"
             
         let exactGradOfShift shift =
             target.values
-            |> Array.map (fun _ -> 2.0 * shift)
+            |> Array.map (fun x -> 2.0 * (shift - x))
             |> VectorND
+
+        let approx = approxGradOfShift 0.0
+        let exact = exactGradOfShift 0.0
 
         [ 0.0; -5.0; 10.0 ]
         |> List.map 
             (fun shift ->
-                ((exactGradOfShift shift).values, 
-                    (approxGradOfShift shift).values)
-                    ||> Array.forall2 (fun l r -> abs(l-r) < 1e-6))
-        |> List.forall id
-        |> Assert.IsTrue
+                normL2 ((exactGradOfShift shift) - (approxGradOfShift shift))
+                |> verySmall)
+        |> List.iter Assert.IsTrue
                     
         ((approxGradOfShift 0.0).values, 
             (approxGradOfShift 5.0).values) 
@@ -85,14 +85,9 @@ type TestLeastSqOptimizer() =
     [<TestMethod>]
     member __.TestDirectOptimization() =      
 
-        let target = 
-            [| 0.0; 3.0; 5.0; -2.0; |] 
-            |> VectorND
-            |> dump "target"
+        let target = [| 0.0; 3.0; 5.0; -2.0; |] |> VectorND     |> dump "target"
 
-        let iter0 = 
-            genRandomVector (-5.0, 5.0) 4
-            |> dump "iter0"
+        let iter0 = genRandomVector (-5.0, 5.0) 4               |> dump "iter0"
 
         iter0
         |> optimize ((-) target >> normL2)
@@ -102,29 +97,35 @@ type TestLeastSqOptimizer() =
                         finalParams
                         finalParams
                         finalLoss
-                let initLoss = 
-                    quadraticLoss nullSparsityPenalty target id iter0
+                let initLoss = ((-) target >> normL2) iter0
                 finalLoss < initLoss
         |> Assert.IsTrue
 
+    [<Ignore>]
     [<TestMethod>]
     member __.TestSlopeInterceptOptimization() =      
 
-        let target = 
-            [| 0.0; 3.0; 5.0; -2.0; |] 
-            |> VectorND
-            |> dump "target"
+        let target = [| 0.0; 3.0; 5.0; -2.0; |] |> VectorND     |> dump "target"
 
-        let iter0 = 
-            genRandomVector (-5.0, 5.0) 4
-            |> dump "iter0"
+        let iter0 = genRandomVector (-5.0, 5.0) 4               |> dump "iter0"
 
         let initSlope = 1.0
         let initOffset = 0.0
 
+        // calculate quadratic loss between
+        //      * target as array of float
+        //      * evaluation of currentFunc at params
+        let quadraticLoss 
+                    (target:VectorND) 
+                    (currentFunc:VectorND->VectorND) 
+                    (forParams:VectorND) =
+            let currentValue = 
+                currentFunc forParams
+            normL2 (currentValue - target)
+
         [| initSlope; initOffset |]
         |> VectorND
-        |> optimize (quadraticLoss nullSparsityPenalty target (currentFromSlopeOffset iter0))
+        |> optimize (quadraticLoss target (currentFromSlopeOffset iter0))
         |> function
             (finalParams, finalLoss) ->    
                 let [|finalSlope; finalOffset|] = finalParams.values
@@ -133,7 +134,7 @@ type TestLeastSqOptimizer() =
                         (currentFromSlopeOffset iter0 finalParams)
                         finalLoss
                 let initLoss = 
-                    quadraticLoss nullSparsityPenalty target (currentFromSlopeOffset iter0) 
+                    quadraticLoss target (currentFromSlopeOffset iter0) 
                         ([| initSlope; initOffset |] |> VectorND)
                 finalLoss < initLoss
         |> Assert.IsTrue
