@@ -9,7 +9,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Include="Issues.fsx" />
     <Compile Include="AsciiGraph.fs" />
     <Compile Include="VectorND.fs" />
     <Compile Include="Helper.fs" />
