@@ -25,7 +25,7 @@ module NumericalGradient =
                         -> if (inner = outer) 
                             then el+delta 
                             else el))
-        |> Seq.map VectorND |> dump "deltas"
+        |> Seq.map VectorND             // |> dump "deltas"
         |> Seq.map lossFunc
         |> Seq.map ((+) -loss)
         |> Seq.map ((*) (1.0/delta))

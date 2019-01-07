@@ -24,23 +24,22 @@ module ImageOptimization =
             let quadLossAndSparsity = quadLoss + (sparsityPenalty forParams)
             quadLossAndSparsity
 
-        let reconstruct (fromSignal:VectorND) = 
-            
-            let signal = ImageVector(width, fromSignal)
+        let reconstruct (fromSignal:VectorND) =             
+            let signal = ImageVector(width/2, fromSignal)
             signal.ImageFunc
-            |> convolve 2 (gauss 1.0)
-            // |> asciiImage 10
-            |> ignore
-            signal
+            |> convolve 3 (gauss 2.0)
+            |> expand
 
         let reconstructSignal (fromSignal:VectorND) = 
-            (reconstruct fromSignal).signal
+            ((reconstruct fromSignal)
+            |> imageToSignal width).signal
 
         let inAsSignal = (imageToSignal width inImage).signal
 
-        genRandomVector (-1.0,1.0) (width*width)
+        genRandomVector (-10.0,10.0) (width*width/4)
         |> optimize (quadraticLoss sparsityPenalty inAsSignal reconstructSignal)
         |> function
             (finalSignal, finalLoss) -> 
-                (reconstruct finalSignal).ImageFunc
+                reconstruct finalSignal
+
 

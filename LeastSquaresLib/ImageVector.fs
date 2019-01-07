@@ -2,10 +2,12 @@
 
 module ImageVector =
 
+    open System.Diagnostics
     open VectorND
 
     [<StructuredFormatDisplay("Ascii")>]
     type ImageVector(width:int, signal:VectorND) =
+        do Trace.Assert(signal.values.Length = width * width)
         member this.width = width
         member this.signal = signal
         member this.ImageFunc x y =

@@ -81,9 +81,13 @@ type TestImageFilters() =
     [<TestMethod>]
     member __.TestMatchReconstruct() =
         circle 5
-        |> (convolve 2 (gauss 0.5))
+        |> (convolve 2 (gauss 1.0))
         |> shift -5 -5
-        |> matchReconstruct nullSparsityPenalty 10
+        |> matchReconstruct 
+            // nullSparsityPenalty
+            (((*) 0.01) >> logSparsity)
+            // (fun v -> 0.01 * (v.values |> Array.sumBy (fun x -> log(1.0 + x*x)))) 
+            10
         |> dumpImage 60
         |> function _ -> true
         |> Assert.IsTrue

@@ -9,7 +9,7 @@ module LeastSqOptimizer =
     type LossFunction = VectorND->float
 
     // update rate determines how much each update pulls the parameters
-    let rate = 0.25
+    let rate = 1e-3
     
     // Seq.unfold-ready function to update parameter vector 
     //      given current loss function values
@@ -34,11 +34,10 @@ module LeastSqOptimizer =
         System.Diagnostics.Trace.Assert(updatedLoss < currentLoss)
 
         updatedParams
-        |> lossFunc
-        |> dump "updated loss"
+        |> lossFunc                                         |> dump "updated loss"
         |> function 
             updatedLoss ->                            
-                if 0.01 < abs(updatedLoss - currentLoss)
+                if 1e-2 < abs(updatedLoss - currentLoss)
                 then Some ((updatedParams, updatedLoss), 
                             (updatedParams, updatedLoss))
                 else None
