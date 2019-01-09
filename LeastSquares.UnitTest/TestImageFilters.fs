@@ -56,6 +56,7 @@ type TestImageFilters() =
         |> compareImageFuncs 10 (circle 5)
         |> Assert.IsTrue
 
+
     [<TestMethod>]
     member __.TestPyramid() =      
 
@@ -65,14 +66,14 @@ type TestImageFilters() =
         circle 5
         |> shift -10 -10
         |> ((convolve 2 (gauss 1.0)) >> decimate)
-        |> imageToSignal 10
-        |> imageFunc
+        |> imageVectorFromFunc 10
+        |> imageFuncFromVector 10
         |> ((convolve 2 (gauss 1.0)) >> decimate)
-        |> imageToSignal 5
-        |> imageFunc
+        |> imageVectorFromFunc 5
+        |> imageFuncFromVector 5
         |> ((convolve 2 (gauss 1.0)) >> decimate)
-        |> imageToSignal 3
-        |> imageFunc
+        |> imageVectorFromFunc 3
+        |> imageFuncFromVector 3
         |> dumpImage 10
         |> function
             level3 -> (level3 0 0) >= 0.0
@@ -83,11 +84,16 @@ type TestImageFilters() =
         circle 5
         |> (convolve 2 (gauss 1.0))
         |> shift -5 -5
-        |> matchReconstruct 
-            // nullSparsityPenalty
-            (((*) 0.01) >> logSparsity)
-            // (fun v -> 0.01 * (v.values |> Array.sumBy (fun x -> log(1.0 + x*x)))) 
-            10
+        |> matchReconstruct 10
         |> dumpImage 60
         |> function _ -> true
         |> Assert.IsTrue
+
+
+    // Gaussian Pyramid match reconstruction
+    //      compare image reconstructed with decimated Gaussian
+    //      to direct Gaussian filter of image (with same kernel)
+
+    // Sparse reconstruction from filter bank
+    //      for gaussian filter bank, random select single
+    //      pixels and set to 1.0

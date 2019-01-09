@@ -11,6 +11,14 @@ open LeastSquaresLib.ImageIO
 
 let [<EntryPoint>] main _ = 
 
+    let fx = (fun (x:float[]) -> x.[0] + 1.0)
+    let gx = (fun (x:float[]) -> x.[0] * 1.0)
+
+    printfn "%f" (fx [| 2.0 |])
+
+    let comp = fx >> (+)
+    printfn "%f" (comp [| 3.0 |] -1.0)
+
     circle 5
     |> shift -5 -5
     |> function 
@@ -19,7 +27,7 @@ let [<EntryPoint>] main _ =
             |> asciiImage (seq{0..10}) 
             |> Seq.iter (printfn "%s")
             image    
-            |> matchReconstruct nullSparsityPenalty 16
+            |> matchReconstruct 16
     |> function 
         image -> 
             image

@@ -93,8 +93,10 @@ module LeastSqOptimizerTest =
 
             let iter0 = genRandomVector (0.0, 50.0) 5             |> dump "iter0"
 
-            let objective =
-                (((-) target >> normL2) +>> ((*) 0.2 >> normL2))
+            let sparsityLambda = 0.2
+            let objective x =
+                (x |> (-) target |> normL2)
+                    + (x |> logSparsity |> (*) sparsityLambda)
 
             iter0
             |> optimize objective
@@ -121,17 +123,22 @@ module LeastSqOptimizerTest =
             // calculate quadratic loss between
             //      * target as array of float
             //      * evaluation of currentFunc at params
-            let quadraticLoss 
-                        (target:VectorND) 
-                        (currentFunc:VectorND->VectorND) 
-                        (forParams:VectorND) =
-                let currentValue = 
-                    currentFunc forParams
-                normL2 (currentValue - target)
+            //let quadraticLoss 
+            //            (target:VectorND) 
+            //            (currentFunc:VectorND->VectorND) 
+            //            (forParams:VectorND) =
+            //    let currentValue = 
+            //        currentFunc forParams
+            //    normL2 (currentValue - target)
 
+            let objective =
+                currentFromSlopeOffset iter0
+                    >> (-) target
+                    >> normL2
             [| initSlope; initOffset |]
             |> VectorND
-            |> optimize (quadraticLoss target (currentFromSlopeOffset iter0))
+            // |> optimize (quadraticLoss target (currentFromSlopeOffset iter0))
+            |> optimize objective
             |> function
                 (finalParams, finalLoss) ->    
                     let [|finalSlope; finalOffset|] = finalParams.values
@@ -140,7 +147,6 @@ module LeastSqOptimizerTest =
                             (currentFromSlopeOffset iter0 finalParams)
                             finalLoss
                     let initLoss = 
-                        quadraticLoss target (currentFromSlopeOffset iter0) 
-                            ([| initSlope; initOffset |] |> VectorND)
+                        objective ([| initSlope; initOffset |] |> VectorND)
                     finalLoss < initLoss
             |> Assert.IsTrue
