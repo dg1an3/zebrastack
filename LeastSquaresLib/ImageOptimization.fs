@@ -7,37 +7,23 @@ module ImageOptimization =
     open LeastSquaresLib.VectorND
     open LeastSquaresLib.ImageVector
 
-    let nullSparsityPenalty (_:VectorND) = 0.0
-
-    let matchReconstruct sparsityPenalty width inImage : ImageFunc =
-        // calculate quadratic loss between
-        //      * target as array of float
-        //      * evaluation of currentFunc at params
-        let quadraticLoss 
-                    (sparsityPenalty:VectorND->float) 
-                    (target:VectorND) 
-                    (currentFunc:VectorND->VectorND) 
-                    (forParams:VectorND) =
-            let currentValue = 
-                currentFunc forParams
-            let quadLoss = normL2 (currentValue - target)
-            let quadLossAndSparsity = quadLoss + (sparsityPenalty forParams)
-            quadLossAndSparsity
+    let matchReconstruct width inImage : ImageFunc =
 
         let reconstruct (fromSignal:VectorND) =             
             let signal = ImageVector(width/2, fromSignal)
-            signal.ImageFunc
+            imageFuncFromVector signal.Width signal.Vector
             |> convolve 3 (gauss 2.0)
             |> expand
 
         let reconstructSignal (fromSignal:VectorND) = 
-            ((reconstruct fromSignal)
-            |> imageToSignal width).signal
+            reconstruct fromSignal
+            |> imageVectorFromFunc width
 
-        let inAsSignal = (imageToSignal width inImage).signal
+        let inVector = imageVectorFromFunc width inImage
 
         genRandomVector (-10.0,10.0) (width*width/4)
-        |> optimize (quadraticLoss sparsityPenalty inAsSignal reconstructSignal)
+        |> optimize ((reconstructSignal >> (-) inVector >> normL2) 
+                        +>> ((*) 0.01 >> logSparsity))
         |> function
             (finalSignal, finalLoss) -> 
                 reconstruct finalSignal
