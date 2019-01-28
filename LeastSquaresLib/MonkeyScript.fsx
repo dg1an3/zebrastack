@@ -19,7 +19,7 @@ let funcToGraphics (gfx:Graphics) (f:int->int->Color) (x,y) =
 
 let funcToBitmap (rng:seq<int>) (f:int->int->Color) =
     let width = (rng |> Seq.max) - (rng |> Seq.min)
-    use bitmap = new Bitmap(width,width)
+    let bitmap = new Bitmap(width,width)
     use graphics = Graphics.FromImage(bitmap)   
     (rng,rng) 
     ||> Seq.allPairs 
@@ -32,7 +32,9 @@ let saveBitmap (bitmap:Bitmap) =
     |> function 
         fn -> 
             use fs = fn |> File.Create
-            bitmap.Save(fs , ImageFormat.Png) ; fn
+            bitmap.Save(fs , ImageFormat.Png)
+            bitmap.Dispose()
+            fn
 
 (fun x y -> let i = 2*x*y|>double|>(*)0.1|>sqrt|>int in Color.FromArgb(i,i,0))
 |> funcToBitmap (seq{0..200})
