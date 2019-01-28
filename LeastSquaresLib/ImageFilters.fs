@@ -34,6 +34,7 @@ module ImageFilters =
     let shift sx sy imageFunc x y = imageFunc (x+sx) (y+sy)
 
     (* convolve operator *)
+    (* TODO: replace kSize with IndexBounds *)
     let convolve kSize (kernel:ImageFunc) (image:ImageFunc) x y =
         (seq {-kSize..kSize}, seq {-kSize..kSize})
         ||> Seq.allPairs

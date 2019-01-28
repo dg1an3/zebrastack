@@ -12,14 +12,11 @@ module ImageIO =
         width representations *)
     let loadImageAsSignal (fileName:string) =
         let loaded = Image.Load(fileName)
-        let width, height = loaded.Width, loaded.Height
-        (seq {0..width-1}, seq {0..height-1})
-        ||> Seq.allPairs
-        |> Seq.map 
-            (fun (x,y) 
-                -> (float loaded.[y,x].B) / 255.0)
-        |> Array.ofSeq
-        |> VectorND
+        {xmin=0; xmax=loaded.Width; ymin=0; ymax=loaded.Height}
         |> function 
-            signal -> ImageVector(width, signal)
+            bounds -> 
+                bounds.allIndices
+                |> Seq.map (fun (x,y) -> (float loaded.[y,x].B) / 255.0)
+                |> (Array.ofSeq >> VectorND)
+                |> function signal -> ImageVector(loaded.Width, bounds, signal)
 
