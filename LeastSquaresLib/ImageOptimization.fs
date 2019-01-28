@@ -10,7 +10,10 @@ module ImageOptimization =
     let matchReconstruct width inImage : ImageFunc =
 
         let reconstruct (fromSignal:VectorND) =             
-            let signal = ImageVector(width/2, fromSignal)
+            let b = 
+                { xmin = 0; xmax = width/2; 
+                    ymin = 0; ymax = fromSignal.values.Length / (width/2) }
+            let signal = ImageVector(width/2, b, fromSignal)
             imageFuncFromVector signal.Width signal.Vector
             |> convolve 3 (gauss 2.0)
             |> expand
