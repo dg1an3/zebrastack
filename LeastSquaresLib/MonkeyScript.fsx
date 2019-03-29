@@ -42,5 +42,13 @@ let saveBitmap (bitmap:Bitmap) =
 |> ProcessStartInfo
 |> Process.Start |> ignore
 
-
-
+open LeastSquaresLib.ImageFilters
+(fun x y -> 
+    (circle 50 |> shift -50 -50) x y
+    |> ((*)250.0) |> int
+    |> fun i -> (i,i,0)
+    |> Color.FromArgb)
+|> funcToBitmap (seq{0..200})
+|> saveBitmap
+|> ProcessStartInfo
+|> Process.Start |> ignore
