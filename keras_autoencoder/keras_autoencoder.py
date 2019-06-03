@@ -21,14 +21,12 @@ print(x_test.shape)
 if use_cifar10: 
     encoding_dim = int(3072*3) # N > M floats
 else: 
-    encoding_dim = 32 # 32 floats -> compression of factor 24.5, assuming input is 784 floats
-input_img = Input(shape=x_train.shape[1:])
-encoded = Dense(encoding_dim, activation='relu',
-                activity_regularizer=regularizers.l1(0.1))(input_img)
-decoded = Dense(x_train.shape[1:][0], activation='sigmoid')(encoded)
+    encoding_dim = 32 # 32 floats for sparse -> compression of factor 24.5, assuming input is 784 floats
+input_img = Input(shape=(784,)) # x_train.shape[1:])
+encoded = Dense(encoding_dim, activation='relu')(input_img)
+decoded = Dense(784, activation='sigmoid')(encoded)
 autoencoder = Model(input_img, decoded)
 
-# create separate encoder
 encoder = Model(input_img, encoded)
 
 # create separate decoder
@@ -36,9 +34,9 @@ encoded_input = Input(shape=(encoding_dim,))
 decoder_layer = autoencoder.layers[-1]
 decoder = Model(encoded_input, decoder_layer(encoded_input))
 
-autoencoder.compile(optimizer='adam', loss='binary_crossentropy')
+autoencoder.compile(optimizer='adadelta', loss='binary_crossentropy')
 
-autoencoder.fit(x_train, x_train, epochs=50, batch_size=256, shuffle=True, validation_data=(x_test,x_test))
+autoencoder.fit(x_train, x_train, epochs=100, batch_size=256, shuffle=True, validation_data=(x_test,x_test))
 
 encoded_imgs = encoder.predict(x_test)
 decoded_imgs = decoder.predict(encoded_imgs)
