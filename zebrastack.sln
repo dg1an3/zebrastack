@@ -7,6 +7,8 @@ Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "LeastSquares.UnitTest", "Le
 EndProject
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "LeastSquaresLib", "LeastSquaresLib\LeastSquaresLib.fsproj", "{16CF630E-5558-4DEA-A306-032456EF9DBE}"
 EndProject
+Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "keras_autoencoder", "keras_autoencoder\keras_autoencoder.pyproj", "{FF1019EB-84A1-4CD0-97D4-C19068728C63}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,8 @@ Global
 		{16CF630E-5558-4DEA-A306-032456EF9DBE}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{16CF630E-5558-4DEA-A306-032456EF9DBE}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{16CF630E-5558-4DEA-A306-032456EF9DBE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FF1019EB-84A1-4CD0-97D4-C19068728C63}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FF1019EB-84A1-4CD0-97D4-C19068728C63}.Release|Any CPU.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
