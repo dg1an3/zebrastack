@@ -23,7 +23,8 @@ if use_cifar10:
 else: 
     encoding_dim = 32 # 32 floats for sparse -> compression of factor 24.5, assuming input is 784 floats
 input_img = Input(shape=(784,)) # x_train.shape[1:])
-encoded = Dense(encoding_dim, activation='relu')(input_img)
+encoded = Dense(encoding_dim, activation='relu',
+                activity_regularizer=regularizers.l2(0.0000001))(input_img)
 decoded = Dense(784, activation='sigmoid')(encoded)
 autoencoder = Model(input_img, decoded)
 
