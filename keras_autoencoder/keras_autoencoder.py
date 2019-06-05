@@ -21,21 +21,27 @@ print(x_test.shape)
 if use_cifar10: 
     encoding_dim = int(3072*3) # N > M floats
 else: 
-    encoding_dim = 32 # 32 floats for sparse -> compression of factor 24.5, assuming input is 784 floats
+    encoding_dim = 128 # 32 floats for sparse -> compression of factor 24.5, assuming input is 784 floats
 input_img = Input(shape=(784,)) # x_train.shape[1:])
-encoded = Dense(encoding_dim, activation='relu',
-                activity_regularizer=regularizers.l2(0.0000001))(input_img)
-decoded = Dense(784, activation='sigmoid')(encoded)
+encoded = Dense(int(encoding_dim), activation='relu', activity_regularizer=regularizers.l1(0.000001))(input_img)
+encoded = Dense(int(encoding_dim/2), activation='relu')(encoded)
+encoded = Dense(int(encoding_dim/4), activation='relu')(encoded)
+
+decoded = Dense(int(encoding_dim/2), activation='relu')(encoded)
+decoded = Dense(int(encoding_dim), activation='relu')(decoded)
+decoded = Dense(784, activation='sigmoid')(decoded)
 autoencoder = Model(input_img, decoded)
 
 encoder = Model(input_img, encoded)
 
 # create separate decoder
-encoded_input = Input(shape=(encoding_dim,))
-decoder_layer = autoencoder.layers[-1]
-decoder = Model(encoded_input, decoder_layer(encoded_input))
+encoded_input = Input(shape=(encoding_dim/4,))
+decoder_layer = autoencoder.layers[-3](encoded_input)
+decoder_layer = autoencoder.layers[-2](decoder_layer)
+decoder_layer = autoencoder.layers[-1](decoder_layer)
+decoder = Model(encoded_input, decoder_layer)
 
-autoencoder.compile(optimizer='adadelta', loss='binary_crossentropy')
+autoencoder.compile(optimizer='adadelta', loss='mean_squared_error')
 
 autoencoder.fit(x_train, x_train, epochs=100, batch_size=256, shuffle=True, validation_data=(x_test,x_test))
 
@@ -55,7 +61,7 @@ for i in range(n):
     
     plt.gray()
     ax.get_xaxis().set_visible(False)
-    ax.get_yaxis().set_visible(False)
+    ax.get_yaxis().set_visible(False) 
 
     # display reconstruction
     ax = plt.subplot(2, n, i + 1 + n)
