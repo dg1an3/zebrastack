@@ -4,7 +4,7 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>ff1019eb-84a1-4cd0-97d4-c19068728c63</ProjectGuid>
     <ProjectHome>.</ProjectHome>
-    <StartupFile>keras_autoencoder.py</StartupFile>
+    <StartupFile>read_dicom_dataset.py</StartupFile>
     <SearchPath>
     </SearchPath>
     <WorkingDirectory>.</WorkingDirectory>
@@ -22,6 +22,8 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="keras_autoencoder.py" />
+    <Compile Include="keras_visualize_filter.py" />
+    <Compile Include="read_dicom_dataset.py" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
   <!-- Uncomment the CoreCompile target to enable the Build command in
