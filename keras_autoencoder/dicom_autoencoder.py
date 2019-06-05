@@ -28,18 +28,20 @@ for path, files in datasets:
         slope, intercept = float(ds.RescaleSlope), float(ds.RescaleIntercept)
         x = np.multiply(x, slope)
         x = np.add(x, intercept)
-        x = resize(x, (28,28))
-        x = np.add(x, 300.0)
+        x = resize(x, (60,60))
+        x = np.add(x, 200.0)
         x = np.divide(x, 400.0)
         x = x.clip(0.0, 1.0)
         imagesets.append((z,x))
 x_train = np.array([x for _, x in imagesets])
-x_train = x_train.reshape((len(x_train), 28, 28, 1))
+x_train = x_train.reshape((len(x_train), 60, 60, 1))
 x_test = np.array(random.sample(list(x_train), int(len(x_train)/10)))
 
 encoding_dim = 128 # 32 floats for sparse -> compression of factor 24.5, assuming input is 784 floats
-input_img = Input(shape=(28,28,1)) # x_train.shape[1:])
+input_img = Input(shape=(60,60,1)) # x_train.shape[1:])
 x = Conv2D(16, (3,3), activation='relu', padding='same')(input_img)
+x = MaxPooling2D((2,2), padding='same')(x)
+x = Conv2D(8, (3,3), activation='relu', padding='same')(x)
 x = MaxPooling2D((2,2), padding='same')(x)
 x = Conv2D(8, (3,3), activation='relu', padding='same')(x)
 x = MaxPooling2D((2,2), padding='same')(x)
@@ -47,6 +49,8 @@ x = Conv2D(8, (3,3), activation='relu', activity_regularizer=regularizers.l1(1.0
 encoded = MaxPooling2D((2,2), padding='same')(x)
 
 x = Conv2D(8, (3,3), activation='relu', padding='same')(encoded)
+x = UpSampling2D((2,2))(x)
+x = Conv2D(8, (3,3), activation='relu', padding='same')(x)
 x = UpSampling2D((2,2))(x)
 x = Conv2D(8, (3,3), activation='relu', padding='same')(x)
 x = UpSampling2D((2,2))(x)
@@ -69,7 +73,7 @@ plt.figure(figsize=(20, 4))
 for i in range(n):
     # display original
     ax = plt.subplot(2, n, i + 1)
-    plt.imshow(x_train[i].reshape(28, 28))
+    plt.imshow(x_test[i].reshape(60, 60))
     
     plt.gray()
     ax.get_xaxis().set_visible(False)
@@ -78,7 +82,7 @@ for i in range(n):
     # display reconstruction
     ax = plt.subplot(2, n, i + 1 + n)
     
-    plt.imshow(decoded_imgs[i].reshape(28, 28))
+    plt.imshow(decoded_imgs[i].reshape(60, 60))
     plt.gray()
     ax.get_xaxis().set_visible(False)
     ax.get_yaxis().set_visible(False)
