@@ -23,9 +23,9 @@ if use_cifar10:
 else: 
     encoding_dim = 128 # 32 floats for sparse -> compression of factor 24.5, assuming input is 784 floats
 input_img = Input(shape=(784,)) # x_train.shape[1:])
-encoded = Dense(int(encoding_dim), activation='relu', activity_regularizer=regularizers.l1(0.000001))(input_img)
+encoded = Dense(int(encoding_dim), activation='relu')(input_img)
 encoded = Dense(int(encoding_dim/2), activation='relu')(encoded)
-encoded = Dense(int(encoding_dim/4), activation='relu')(encoded)
+encoded = Dense(int(encoding_dim/4), activation='relu', activity_regularizer=regularizers.l1(1.0e-8))(encoded)
 
 decoded = Dense(int(encoding_dim/2), activation='relu')(encoded)
 decoded = Dense(int(encoding_dim), activation='relu')(decoded)
@@ -71,5 +71,5 @@ for i in range(n):
     plt.gray()
     ax.get_xaxis().set_visible(False)
     ax.get_yaxis().set_visible(False)
-plt.show()
+plt.show(block=True)
 print('done')
