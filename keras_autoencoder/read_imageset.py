@@ -64,7 +64,7 @@ def read_imageset_arrays(dataset_name, sz):
     reads the npy files for a given dataset
     """
     slice_arrays = None
-    for path, _, files in os.walk(get_dataset_path(dataset_name)):
+    for path, _, files in os.walk(get_dataset_path(dataset_name, sz)):
         if len(files) == 0:
             continue
         for file in files:
@@ -78,9 +78,7 @@ def read_imageset_arrays(dataset_name, sz):
     return slice_arrays
 
 if __name__ == '__main__':
-    """
-    processor to create npy from dicom slices
-    """
+    # processor to create npy from dicom slices
     tcia_path = os.environ('TCIA_DATA')
     import_dataset('\\'.join([tcia_path, 'LIDC-IDRI']), 'LIDC', 60)
     import_dataset('\\'.join([tcia_path, 'AAPM-SPIE']), 'AAPM-SPIE', 60)
