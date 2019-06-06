@@ -45,28 +45,5 @@ autoencoder.fit(x_train, x_train, epochs=50, batch_size=256, shuffle=True, valid
 
 decoded_imgs = autoencoder.predict(x_test)
 
-# use Matplotlib (don't ask)
-import matplotlib.pyplot as plt
-
-n = 10  # how many digits we will display
-plt.figure(figsize=(20, 4))
-for i in range(n):
-    # display original
-    ax = plt.subplot(2, n, i + 1)
-    if use_cifar10: plt.imshow(x_test[i].reshape(32, 32, 3))
-    else: plt.imshow(x_test[i].reshape(28, 28))
-    
-    plt.gray()
-    ax.get_xaxis().set_visible(False)
-    ax.get_yaxis().set_visible(False) 
-
-    # display reconstruction
-    ax = plt.subplot(2, n, i + 1 + n)
-    
-    if use_cifar10: plt.imshow(decoded_imgs[i].reshape(32, 32, 3))
-    else: plt.imshow(decoded_imgs[i].reshape(28, 28))
-    plt.gray()
-    ax.get_xaxis().set_visible(False)
-    ax.get_yaxis().set_visible(False)
-plt.show(block=True)
-print('done')
+from show_original_decoded import show_original_decoded
+show_original_decoded(x_train, decoded_imgs, 28)
