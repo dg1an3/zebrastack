@@ -12,8 +12,9 @@ from keras.preprocessing.image import save_img
 import keras.regularizers
 
 
-from read_imageset import read_imageset_arrays    
-x_train = read_imageset_arrays('SPIE-AAPM', 60)
+from read_imageset import read_imageset_arrays
+# x_train = read_imageset_arrays('SPIE-AAPM', 60)
+x_train = read_imageset_arrays('LIDC-IDRI', 60)
 x_test = np.array(random.sample(list(x_train), int(len(x_train)/10)))
 
 encoding_dim = 128 # 32 floats for sparse -> compression of factor 24.5, assuming input is 784 floats
@@ -24,7 +25,7 @@ x = Conv2D(8, (3,3), activation='relu', padding='same')(x)
 x = MaxPooling2D((2,2), padding='same')(x)
 x = Conv2D(8, (3,3), activation='relu', padding='same')(x)
 x = MaxPooling2D((2,2), padding='same')(x)
-x = Conv2D(8, (3,3), activation='relu', activity_regularizer=regularizers.l1(1.0e-8), padding='same')(x)
+x = Conv2D(8, (3,3), activation='relu', activity_regularizer=regularizers.l1(1.0e-6), padding='same')(x)
 encoded = MaxPooling2D((2,2), padding='same')(x)
 
 x = Conv2D(8, (3,3), activation='relu', padding='same')(encoded)
