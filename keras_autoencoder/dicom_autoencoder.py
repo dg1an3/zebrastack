@@ -12,14 +12,14 @@ from keras.preprocessing.image import save_img
 import keras.regularizers
 
 
-dataset_directory = "E:\\Data\\tcia\\SPIE-AAPM Lung CT Challenge"
-# dataset_directory = "E:\\Data\\tcia\\LIDC-IDRI"
+# dataset_directory = "E:\\Data\\tcia\\SPIE-AAPM Lung CT Challenge"
+dataset_directory = "E:\\Data\\tcia\\LIDC-IDRI"
 imagesets = []
 datasets = [(path, files) for path, _, files in os.walk(dataset_directory) if len(files) > 0]
 for path, files in datasets:
     dss = [pydicom.dcmread(path+ "\\"+ file) for file in files if file.endswith('dcm')]
     dss = [(float(ds.ImagePositionPatient[2]), ds) for ds in dss if hasattr(ds, 'ImagePositionPatient')]
-    dss = random.sample(dss, int(len(dss)/10))
+    dss = random.sample(dss, int(len(dss)/1))
     dss.sort(key=lambda pair:pair[0])
     for z, ds in dss:
         print(ds.filename, z)
