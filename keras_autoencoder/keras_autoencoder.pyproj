@@ -21,6 +21,9 @@
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="build_autoencoder.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="keras_autoencoder.py" />
     <Compile Include="keras_visualize_filter.py" />
     <Compile Include="dicom_autoencoder.py" />
