@@ -12,35 +12,8 @@ from keras.preprocessing.image import save_img
 import keras.regularizers
 
 
-dataset_directory = "E:\\Data\\tcia\\SPIE-AAPM Lung CT Challenge"
-# dataset_directory = "E:\\Data\\tcia\\LIDC-IDRI"
-imagesets = []
-datasets = [(path, files) for path, _, files in os.walk(dataset_directory) if len(files) > 0]
-for path, files in datasets:
-    dss = [pydicom.dcmread(path+ "\\"+ file) for file in files if file.endswith('dcm')]
-    imageset_id = dss[0].PatientID + '_' + dss[0].AcquisitionDate
-    dss = [(float(ds.ImagePositionPatient[2]), ds) for ds in dss if hasattr(ds, 'ImagePositionPatient')]
-    dss = random.sample(dss, int(len(dss)/1))
-    # dss.sort(key=lambda pair:pair[0])
-    images = []
-    for z, ds in dss:
-        print(ds.filename, z)
-        x = ds.pixel_array
-        x = x.astype('float32')
-        slope, intercept = float(ds.RescaleSlope), float(ds.RescaleIntercept)
-        x = np.multiply(x, slope)
-        x = np.add(x, intercept)
-        x = resize(x, (60,60))
-        x = np.add(x, 200.0)
-        x = np.divide(x, 400.0)
-        x = x.clip(0.0, 1.0)
-        images.append(x)
-        imagesets.append((z,x))
-    images = np.array(images)
-    images = images.reshape((len(images), 60, 60, 1))
-    np.save('data\\SPIE-AAPM\\60x60\\'+imageset_id, images)
-x_train = np.array([x for _, x in imagesets])
-x_train = x_train.reshape((len(x_train), 60, 60, 1))
+from read_imageset import read_imageset_arrays    
+x_train = read_imageset_arrays('SPIE-AAPM', 60)
 x_test = np.array(random.sample(list(x_train), int(len(x_train)/10)))
 
 encoding_dim = 128 # 32 floats for sparse -> compression of factor 24.5, assuming input is 784 floats
@@ -67,9 +40,11 @@ decoded = Conv2D(1, (3,3), activation='sigmoid', padding='same')(x)
 autoencoder = Model(input_img, decoded)
 autoencoder.compile(optimizer='adadelta', loss='mean_squared_error')
 
-autoencoder.fit(x_train, x_train, epochs=50, batch_size=256, shuffle=True, validation_data=(x_test,x_test))
+autoencoder.fit(x_train, x_train, epochs=100, batch_size=256, shuffle=True, validation_data=(x_test,x_test))
 
 decoded_imgs = autoencoder.predict(x_test)
+
+# TODO: move this to display_imageset
 
 # use Matplotlib (don't ask)
 import matplotlib.pyplot as plt
