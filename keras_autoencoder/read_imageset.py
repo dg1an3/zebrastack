@@ -1,4 +1,4 @@
-import os
+import os, random
 import pydicom
 import numpy as np
 from skimage.transform import resize
@@ -59,7 +59,7 @@ def import_dataset(path_name, dataset_name, sz):
             out_filename = get_dataset_path(dataset_name, imageset_id=get_imageset_id(ds))
             np.save(out_filename, images)
 
-def read_imageset_arrays(dataset_name, sz):
+def read_imageset_arrays(dataset_name, sz, frac=1.0):
     """
     reads the npy files for a given dataset
     """
@@ -70,7 +70,11 @@ def read_imageset_arrays(dataset_name, sz):
         for file in files:
             if not(file.endswith('npy')):
                 continue
-            slice_array = np.load('\\'.join([path, file]))
+            if (random.random() > frac):
+                continue;
+            dataset_fullpath = '\\'.join([path, file])
+            print('loading dataset: ', dataset_fullpath)
+            slice_array = np.load(dataset_fullpath)
             if (slice_arrays is None):
                 slice_arrays = slice_array
             else:
