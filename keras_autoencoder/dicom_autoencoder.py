@@ -7,7 +7,7 @@ from show_original_decoded import show_original_decoded
 if __name__ == '__main__':
 
     sz = 60
-    dataset_name = 'SPIE-AAPM'
+    # dataset_name = 'SPIE-AAPM'
     dataset_name = 'LIDC-IDRI'
 
     x_train = read_imageset_arrays(dataset_name, sz, 1.0)
@@ -20,4 +20,9 @@ if __name__ == '__main__':
 
     decoded_imgs = autoencoder.predict(x_test)
     encode_only_imgs = encode_only.predict(x_test)
+    for n in range(10):
+        print("shape of encoded = ", encode_only_imgs[n].shape)
+        hist, bins = np.histogram(encode_only_imgs[n])
+        print(hist)
+        print(bins)
     show_original_decoded(x_test, decoded_imgs, 60)
