@@ -1,5 +1,5 @@
 from keras.models import Model
-from keras.layers import Input, SpatialDropout2D, Conv2D, MaxPooling2D, UpSampling2D, ActivityRegularization
+from keras.layers import Input, SpatialDropout2D, Conv2D, LocallyConnected2D, ZeroPadding2D, MaxPooling2D, UpSampling2D, ActivityRegularization
 from keras import regularizers
 
 def build_autoencoder(sz, optimizer, loss):
@@ -11,13 +11,15 @@ def build_autoencoder(sz, optimizer, loss):
     x = MaxPooling2D((2,2), padding='same')(x)
     x = Conv2D(16, (3,3), activation='relu', padding='same')(x)
     x = MaxPooling2D((2,2), padding='same')(x)
-    x = Conv2D(16, (3,3), activation='relu', padding='same')(x)    
+    x = LocallyConnected2D(16, (3,3))(x)
+    x = ZeroPadding2D(padding=(1,1))(x)
     x = MaxPooling2D((2,2), padding='same')(x)
-    encoded = ActivityRegularization(l1=1.0e-6,l2=1.0e-6)(x)
+    encoded = ActivityRegularization(l1=5.0e-6,l2=1.0e-6)(x)
 
     # TODO: add threshold layer for sparsity test
 
-    x = Conv2D(16, (3,3), activation='relu', padding='same')(encoded)
+    x = LocallyConnected2D(16, (3,3))(x)
+    x = ZeroPadding2D(padding=(1,1))(x)
     x = UpSampling2D((2,2))(x)
     x = Conv2D(16, (3,3), activation='relu', padding='same')(x)
     x = UpSampling2D((2,2))(x)
