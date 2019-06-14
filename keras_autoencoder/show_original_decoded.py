@@ -11,7 +11,7 @@ def show_original_decoded(original, decoded, sz):
     n = 10  # how many digits we will display
     plt.figure(figsize=(n*2, 4))
     for i in range(n):
-        show_grayscale(2, n, i+1, original[i], 60)
-        show_grayscale(2, n, i+1+n, decoded[i], 60)
+        show_grayscale(2, n, i+1, original[i], sz)
+        show_grayscale(2, n, i+1+n, decoded[i], sz)
     plt.show(block=True)
 

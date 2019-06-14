@@ -18,15 +18,15 @@ def get_dataset_path(dataset_name, sz, npy_fname = None):
         parts.append(npy_fname)
     return '\\'.join(parts)
 
-def read_slice(full_path):
+def read_slice(full_path, sz):
     """
     reads a DICOM slice given the file full path
     """
     if not(full_path.endswith('dcm')):
-        return None
+        return None, None
     ds = pydicom.dcmread(full_path)
     if not(hasattr(ds, 'ImagePositionPatient')):
-        return None
+        return None, None
 
     print(ds.filename, ds.ImagePositionPatient[2])
     slice_array = ds.pixel_array
@@ -51,19 +51,20 @@ def import_dataset(path_name, dataset_name, sz):
             continue
         images, ds = [], None
         for file in files:
-            ds, slice_array = read_slice('\\'.join([file, path]))
-            images.append(slice_array)
+            next_ds, slice_array = read_slice('\\'.join([path, file]), sz)
+            if not(slice_array is None):
+                ds = next_ds
+                images.append(slice_array)
         if (len(images) > 0):
             images = np.array(images)
             images = images.reshape((len(images), sz, sz, 1)) 
-            out_filename = get_dataset_path(dataset_name, imageset_id=get_imageset_id(ds))
+            out_filename = get_dataset_path(dataset_name, sz, npy_fname=get_imageset_npy_fname(ds))
             np.save(out_filename, images)
 
-def read_imageset_arrays(dataset_name, sz, frac=1.0):
+def gen_imageset_array(dataset_name, sz, frac=1.0):
     """
     reads the npy files for a given dataset
     """
-    slice_arrays = None
     for path, _, files in os.walk(get_dataset_path(dataset_name, sz)):
         if len(files) == 0:
             continue
@@ -74,15 +75,19 @@ def read_imageset_arrays(dataset_name, sz, frac=1.0):
                 continue;
             dataset_fullpath = '\\'.join([path, file])
             print('loading dataset: ', dataset_fullpath)
-            slice_array = np.load(dataset_fullpath)
-            if (slice_arrays is None):
-                slice_arrays = slice_array
-            else:
-                slice_arrays = np.append(slice_arrays, slice_array, axis=0)
-    return slice_arrays
+            yield np.load(dataset_fullpath)
+
+def read_imageset_arrays(dataset_name, sz, frac=1.0):
+    """
+    reads the npy files for a given dataset
+    """
+    slice_arrays = gen_imageset_array(dataset_name, sz, frac)
+    slice_arrays = list(slice_arrays)
+    super_array = np.concatenate(slice_arrays)
+    return super_array
 
 if __name__ == '__main__':
     # processor to create npy from dicom slices
-    tcia_path = os.environ('TCIA_DATA')
-    import_dataset('\\'.join([tcia_path, 'LIDC-IDRI']), 'LIDC', 60)
-    import_dataset('\\'.join([tcia_path, 'AAPM-SPIE']), 'AAPM-SPIE', 60)
+    tcia_path = os.environ['TCIA_DATA']
+    import_dataset('\\'.join([tcia_path, 'LIDC-IDRI']), 'LIDC-IDRI', 128)
+    # import_dataset('\\'.join([tcia_path, 'SPIE-AAPM Lung CT Challenge']), 'SPIE-AAPM', 128)
