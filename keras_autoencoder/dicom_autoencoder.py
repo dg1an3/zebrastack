@@ -6,11 +6,11 @@ from show_original_decoded import show_original_decoded
 
 if __name__ == '__main__':
 
-    sz = 60
-    # dataset_name = 'SPIE-AAPM'
+    sz = 128
+    dataset_name = 'SPIE-AAPM'
     dataset_name = 'LIDC-IDRI'
 
-    x_train = read_imageset_arrays(dataset_name, sz, 1.0)
+    x_train = read_imageset_arrays(dataset_name, sz, 0.5)
     x_test = np.array(random.sample(list(x_train), int(len(x_train)/10)))
 
     autoencoder, encode_only = build_autoencoder(sz, 'adadelta', 'mean_squared_error')
@@ -25,4 +25,4 @@ if __name__ == '__main__':
         hist, bins = np.histogram(encode_only_imgs[n])
         print(hist)
         print(bins)
-    show_original_decoded(x_test, decoded_imgs, 60)
+    show_original_decoded(x_test, decoded_imgs, sz)
