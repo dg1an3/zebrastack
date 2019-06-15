@@ -21,12 +21,17 @@ import matplotlib.pyplot as plt
 from skimage import data
 from skimage.feature import register_translation
 from skimage.feature.register_translation import _upsampled_dft
+import skimage.transform as tf
 from scipy.ndimage import fourier_shift
 
 image = data.camera()
 shift = (-22.4, 13.32)
+
+scale_xform = tf.SimilarityTransform(scale=1.0)
+scaled_image = tf.warp(image, scale_xform)
+
 # The shift corresponds to the pixel offset relative to the reference image
-offset_image = fourier_shift(np.fft.fftn(image), shift)
+offset_image = fourier_shift(np.fft.fftn(scaled_image), shift)
 offset_image = np.fft.ifftn(offset_image)
 print("Known offset (y, x): {}".format(shift))
 
