@@ -1,5 +1,5 @@
 from keras.models import Model
-from keras.layers import Input, SpatialDropout2D, Conv2D, LocallyConnected2D, ZeroPadding2D, MaxPooling2D, UpSampling2D, ActivityRegularization
+from keras.layers import Input, SpatialDropout2D, Conv2D, Conv2DTranspose, LocallyConnected2D, ZeroPadding2D, MaxPooling2D, UpSampling2D, ActivityRegularization
 from keras.utils import plot_model
 from keras import regularizers
 
@@ -22,11 +22,11 @@ def build_autoencoder(sz, optimizer, loss):
     x = LocallyConnected2D(16, (3,3))(encoded)
     x = ZeroPadding2D(padding=(1,1))(x)
     x = UpSampling2D((2,2))(x)
-    x = Conv2D(16, (3,3), activation='relu', padding='same')(x)
+    x = Conv2DTranspose(16, (3,3), activation='relu', padding='same')(x)
     x = UpSampling2D((2,2))(x)
-    x = Conv2D(16, (3,3), activation='relu', padding='same')(x)
+    x = Conv2DTranspose(16, (3,3), activation='relu', padding='same')(x)
     x = UpSampling2D((2,2))(x)
-    x = Conv2D(32, (3,3), activation='relu', padding='same')(x)
+    x = Conv2DTranspose(32, (3,3), activation='relu', padding='same')(x)
     x = UpSampling2D((2,2))(x)
     decoded = Conv2D(1, (3,3), activation='sigmoid', padding='same')(x)
     

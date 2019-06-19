@@ -10,12 +10,12 @@ if __name__ == '__main__':
     dataset_name = 'SPIE-AAPM'
     dataset_name = 'LIDC-IDRI'
 
-    x_train = read_imageset_arrays(dataset_name, sz, 0.4)
+    x_train = read_imageset_arrays(dataset_name, sz, 0.3)
     x_test = np.array(random.sample(list(x_train), int(len(x_train)/10)))
 
     autoencoder, encode_only, decode_only = build_autoencoder(sz, 'adadelta', 'mean_squared_error')
     autoencoder.fit(x_train, x_train, 
-                    epochs=100, batch_size=256, 
+                    epochs=80, batch_size=256, 
                     shuffle=True, validation_data=(x_test,x_test))
 
     # decoded_imgs = autoencoder.predict(x_test)
@@ -30,7 +30,7 @@ if __name__ == '__main__':
 
     # add random values to decoded
     perturb_vectors = np.random.standard_normal(size=encode_only_imgs.shape)
-    perturb_vectors = np.multiply(perturb_vectors, 2.0)
+    perturb_vectors = np.multiply(perturb_vectors, 0.8)
     encode_only_imgs = np.add(encode_only_imgs, perturb_vectors)
 
     decoded_imgs = decode_only.predict(encode_only_imgs)
