@@ -4,7 +4,7 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>ff1019eb-84a1-4cd0-97d4-c19068728c63</ProjectGuid>
     <ProjectHome>.</ProjectHome>
-    <StartupFile>plot_register_translation.py</StartupFile>
+    <StartupFile>dicom_autoencoder.py</StartupFile>
     <SearchPath>
     </SearchPath>
     <WorkingDirectory>.</WorkingDirectory>
@@ -38,6 +38,8 @@
     <Compile Include="show_original_decoded.py">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="variational_autoencoder.py" />
+    <Compile Include="variational_autoencoder_deconv.py" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
   <!-- Uncomment the CoreCompile target to enable the Build command in
