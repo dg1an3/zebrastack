@@ -30,8 +30,26 @@ if __name__ == '__main__':
 
     # add random values to decoded
     perturb_vectors = np.random.standard_normal(size=encode_only_imgs[2].shape)
-    perturb_vectors = np.multiply(perturb_vectors, 0.001)
-    encode_only_imgs = np.add(encode_only_imgs[2], perturb_vectors)
+    perturb_vectors = np.multiply(perturb_vectors, 5.6)
+    encode_only_imgs_z = np.add(encode_only_imgs[2], perturb_vectors)
 
-    decoded_imgs = decode_only.predict(encode_only_imgs)
+    decoded_imgs = decode_only.predict(encode_only_imgs_z)
+    show_original_decoded(x_test, decoded_imgs, sz)
+
+
+    # add random values to decoded
+    perturb_vectors = np.random.standard_normal(size=encode_only_imgs[2].shape)
+    perturb_vectors = np.multiply(perturb_vectors, 3.8)
+    encode_only_imgs_z = np.add(encode_only_imgs[2], perturb_vectors)
+
+    decoded_imgs = decode_only.predict(encode_only_imgs_z)
+    show_original_decoded(x_test, decoded_imgs, sz)
+
+
+    # add random values to decoded
+    perturb_vectors = np.random.standard_normal(size=encode_only_imgs[2].shape)
+    perturb_vectors = np.multiply(perturb_vectors, 1.9)
+    encode_only_imgs_z = np.add(encode_only_imgs[2], perturb_vectors)
+
+    decoded_imgs = decode_only.predict(encode_only_imgs_z )
     show_original_decoded(x_test, decoded_imgs, sz)
