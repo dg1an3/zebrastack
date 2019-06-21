@@ -8,9 +8,9 @@ if __name__ == '__main__':
 
     sz = 128
     dataset_name = 'SPIE-AAPM'
-    dataset_name = 'LIDC-IDRI'
+    # dataset_name = 'LIDC-IDRI'
 
-    x_train = read_imageset_arrays(dataset_name, sz, 0.3)
+    x_train = read_imageset_arrays(dataset_name, sz, 0.1)
     x_test = np.array(random.sample(list(x_train), int(len(x_train)/10)))
 
     autoencoder, encode_only, decode_only = build_autoencoder(sz, 'adadelta', 'mean_squared_error')
