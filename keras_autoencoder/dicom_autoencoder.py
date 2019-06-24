@@ -7,8 +7,8 @@ from show_original_decoded import show_original_decoded
 if __name__ == '__main__':
 
     sz = 128
-    dataset_name = 'SPIE-AAPM'
-    # dataset_name = 'LIDC-IDRI'
+    # dataset_name = 'SPIE-AAPM'
+    dataset_name = 'LIDC-IDRI'
 
     x_train = read_imageset_arrays(dataset_name, sz, 1.0)
     x_test = np.array(random.sample(list(x_train), int(len(x_train)/10)))
