@@ -15,7 +15,7 @@ if __name__ == '__main__':
 
     autoencoder, encode_only, decode_only = build_autoencoder(sz, 'adadelta', 'mean_squared_error')
     autoencoder.fit(x_train, x_train, 
-                    epochs=100, batch_size=256, 
+                    epochs=250, batch_size=256, 
                     shuffle=True, validation_data=(x_test,x_test))
 
     # decoded_imgs = autoencoder.predict(x_test)
@@ -30,7 +30,7 @@ if __name__ == '__main__':
 
     # add random values to decoded
     perturb_vectors = np.random.standard_normal(size=encode_only_imgs[2].shape)
-    perturb_vectors = np.multiply(perturb_vectors, 5.6)
+    perturb_vectors = np.multiply(perturb_vectors, 10.6)
     encode_only_imgs_z = np.add(encode_only_imgs[2], perturb_vectors)
 
     decoded_imgs = decode_only.predict(encode_only_imgs_z)
@@ -39,7 +39,7 @@ if __name__ == '__main__':
 
     # add random values to decoded
     perturb_vectors = np.random.standard_normal(size=encode_only_imgs[2].shape)
-    perturb_vectors = np.multiply(perturb_vectors, 3.8)
+    perturb_vectors = np.multiply(perturb_vectors, 7.8)
     encode_only_imgs_z = np.add(encode_only_imgs[2], perturb_vectors)
 
     decoded_imgs = decode_only.predict(encode_only_imgs_z)
@@ -48,7 +48,7 @@ if __name__ == '__main__':
 
     # add random values to decoded
     perturb_vectors = np.random.standard_normal(size=encode_only_imgs[2].shape)
-    perturb_vectors = np.multiply(perturb_vectors, 1.9)
+    perturb_vectors = np.multiply(perturb_vectors, 4.9)
     encode_only_imgs_z = np.add(encode_only_imgs[2], perturb_vectors)
 
     decoded_imgs = decode_only.predict(encode_only_imgs_z )
