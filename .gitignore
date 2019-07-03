@@ -261,3 +261,6 @@ paket-files/
 __pycache__/
 *.pyc
 /keras_autoencoder/data/*
+/.ionide
+/keras_autoencoder/.ipynb_checkpoints
+/keras_autoencoder/models

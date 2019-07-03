@@ -41,6 +41,9 @@
     <Compile Include="variational_autoencoder.py" />
     <Compile Include="variational_autoencoder_deconv.py" />
   </ItemGroup>
+  <ItemGroup>
+    <Content Include="dicom_autoencoder.ipynb" />
+  </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
   <!-- Uncomment the CoreCompile target to enable the Build command in
        Visual Studio and specify your pre- and post-build commands in
