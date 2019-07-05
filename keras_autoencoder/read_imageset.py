@@ -95,5 +95,7 @@ def read_imageset_arrays(dataset_name, sz, frac=1.0):
 if __name__ == '__main__':
     # processor to create npy from dicom slices
     tcia_path = os.environ['TCIA_DATA']
-    import_dataset('\\'.join([tcia_path, 'LIDC-IDRI']), 'LIDC-IDRI', 128)
+    # import_dataset('\\'.join([tcia_path, 'LIDC-IDRI']), 'LIDC-IDRI', 128)
     # import_dataset('\\'.join([tcia_path, 'SPIE-AAPM Lung CT Challenge']), 'SPIE-AAPM', 128)
+    import_dataset('\\'.join([tcia_path, 'SPIE-AAPM Lung CT Challenge']), 'SPIE-AAPM', 256)
+

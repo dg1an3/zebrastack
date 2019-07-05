@@ -4,7 +4,7 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>ff1019eb-84a1-4cd0-97d4-c19068728c63</ProjectGuid>
     <ProjectHome>.</ProjectHome>
-    <StartupFile>dicom_autoencoder.py</StartupFile>
+    <StartupFile>read_imageset.py</StartupFile>
     <SearchPath>
     </SearchPath>
     <WorkingDirectory>.</WorkingDirectory>
