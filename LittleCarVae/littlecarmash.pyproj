@@ -5,7 +5,7 @@
     <ProjectGuid>0eb231cf-807e-4ca4-9a32-f1c42d98ea54</ProjectGuid>
     <ProjectHome>
     </ProjectHome>
-    <StartupFile>littlecarmash.py</StartupFile>
+    <StartupFile>ProcessedImage.py</StartupFile>
     <SearchPath>
     </SearchPath>
     <WorkingDirectory>.</WorkingDirectory>

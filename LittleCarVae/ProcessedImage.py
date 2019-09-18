@@ -1,5 +1,9 @@
-import numpy as np
+import os
 from enum import Enum
+import numpy as np
+import matplotlib.image as mpimg
+from skimage.transform import resize
+from skimage.util import crop, pad
 
 class ColorModel(Enum):
     RGB = 1
@@ -12,26 +16,29 @@ class ProcessedImage(object):
 		self.cache = {}
 		self.original_img = None
 
+	def __str__(self):
+		self_str = 'ProcessedImage for {} ({} in cache)'
+		return self_str.format(self.fullpath, len(self.cache))
+
 	def get_original(self):
-		# load the image, if not already
-		if not self.original_img:
-			import matplotlib.image as mpimg
-			self.original_img = mpimg.imread(fullpath)
+		""" load the original image, if not already """
+		if self.original_img is None:
+			self.original_img = mpimg.imread(self.fullpath)
 		return self.original_img
 
 	def get_processed_image(self, sz=64, color_model=ColorModel.GRAY, augment_imgs=False):
-		img, _ = self.cache.get((sz,color_model))
-		if not processed_array:
-			from skimage.transform import resize, crop
+		""" gets a processed version of the image, if not in cache """
+		if not (sz,color_model) in self.cache:
 			img = self.get_original()
-
-			# crop the image
-			if augment_imgs:
+			
+			if augment_imgs:   # crop the image, if augment requested
 				# TODO: generate margins randomly?
 				img = crop(img, ((5,0),(3,2),(0,0)))
+			
+			img = resize(img, (sz,sz), anti_aliasing=True)
 
-			# resize the image
-			img = resize(img, (128,128), anti_aliasing=True)
+			if color_model == ColorModel.GRAY: 
+				img = img[...,0]
 
 			# whiten the image
 			mean, std = img[:][:][:][0].mean(), img[:][:][:][0].std()
@@ -39,8 +46,11 @@ class ProcessedImage(object):
 			img = img / std
 
 			# add to the cache
-			self.cache[sz,color_model] = processed_array, (mean,std)
-		return img
+			self.cache[(sz,color_model)] = img, (mean,std)
+			return img
+		else:
+			img, _ = self.cache[(sz,color_model)]
+			return img
 
 	def reconstruct_from_predicted(self, predicted, color_model=ColorModel.GRAY):
 		sz = predicted.shape[0]
@@ -50,12 +60,29 @@ class ProcessedImage(object):
 		reconst = reconst - mean
 		return reconst
 
-	def render_image(self, ax, array=None):
-		pass
+	@staticmethod
+	def image_strip(imgs, axes, predicted=None):
+		""" shows a collection of images, and possibly their reconstruction, on a figure axes """
+		for n in range(axes.shape[-1]):
+			img = imgs[n].get_processed_image()
+			if (len(axes.shape) == 1):
+				axis = axes[n]
+			else:
+				axis = axes[0,n]
+			axis.imshow(img, cmap='gray')
+			if not predicted is None:
+				reconst = img.reconstruct_from_predicted(predicted[imgs[n].fullpath])
+				axes[1][n].imshow(reconst)
 
 	@staticmethod
 	def from_dir(dirname):
-		import os
+		""" returns a collection of images from a directory to be searched """
 		for path, _, files in os.walk(dirname): 
 			for file in files:
-				yield ProcessedImage(os.path.combine(path,file)) 
+				yield ProcessedImage(os.path.join(path,file)) 
+
+if __name__ == '__main__':
+	processed_imgs = ProcessedImage.from_dir('..\\Data')
+	for img in processed_imgs:
+		print(img)
+		print('Processed image shape = {}'.format(img.get_processed_image().shape))
