@@ -1,5 +1,7 @@
-"""
-ProcessedImage module
+""" processed_image module
+represents an original data image, and the logic for pre-processing and making
+it ready for training.  also caches the different options.
+Eventually, may wrap up persistence cached versions of the image
 """
 
 import os
@@ -11,13 +13,13 @@ from skimage.transform import resize
 from skimage.util import crop
 
 class ColorModel(Enum):
-    """ ColorModel """
+    """Enum that represents different color models."""
     RGB = 1
     HSV = 2
     GRAY = 3
 
 class ProcessedImage:
-    """ ProcessedImage """
+    """Represents a single original image, and the processed versions of same."""
     def __init__(self, fullpath):
         self.fullpath = fullpath
         self.cache = {}
@@ -28,13 +30,13 @@ class ProcessedImage:
         return self_str.format(self.fullpath, len(self.cache))
 
     def get_original(self):
-        """load the original image, if not already."""
+        """Load the original image, if not already loaded."""
         if self.original_img is None:
             self.original_img = mpimg.imread(self.fullpath)
         return self.original_img
 
     def get_processed_image(self, size=64, color_model=ColorModel.GRAY, augment_imgs=False):
-        """gets a processed version of the image, if not in cache."""
+        """Gets a processed version of the image, if not in cache."""
         if not (size, color_model) in self.cache:
             img = self.get_original()
 
@@ -68,7 +70,7 @@ class ProcessedImage:
         return reconst
 
 def show_image_strip(imgs, axes, predicted_dict=None):
-    """shows a collection of images, and possibly their reconstruction, on a figure axes."""
+    """Shows a collection of images, and possibly their reconstruction, on a figure axes."""
     for n in range(axes.shape[-1]):
         img = imgs[n].get_processed_image()
         if len(axes.shape) == 1:
@@ -82,7 +84,7 @@ def show_image_strip(imgs, axes, predicted_dict=None):
             axes[1][n].imshow(reconst, cmap='gray')
 
 def read_from_dir(dirname):
-    """a collection of images from a directory to be searched."""
+    """Collection of images from a directory to be searched."""
     for path, _, files in os.walk(dirname):
         for file in files:
             yield ProcessedImage(os.path.join(path, file))

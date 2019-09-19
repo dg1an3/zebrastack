@@ -1,21 +1,21 @@
-"""
-model_vae_3stage
+""" model_vae_3stage module
+encapsulates VAE model in a class
 """
 
+from keras.activations import relu, sigmoid
 from keras.layers import Dense, Input, SpatialDropout2D
 from keras.layers import Conv2D, Flatten, Lambda
 from keras.layers import LocallyConnected2D, ZeroPadding2D
 from keras.layers import MaxPooling2D, UpSampling2D
 from keras.layers import Reshape, Conv2DTranspose
 from keras.layers import ActivityRegularization
-from keras.activations import relu, sigmoid
 
 from keras.models import Model
 from keras.losses import mse, binary_crossentropy
 from keras.utils import plot_model
 from keras import backend as K
 
-def build_encoded_layer(size, in_channels=1, latent_dim=8, use_dropout=False):
+def build_encoded_layer(size, in_channels=1, latent_dim=8, l1=0.0e-4, l2=0.0e-4, use_dropout=False):
     """Create encoded layer, prior to projection to latent space."""
     input_img = Input(shape=(size, size, in_channels))
 
@@ -34,7 +34,7 @@ def build_encoded_layer(size, in_channels=1, latent_dim=8, use_dropout=False):
     x = LocallyConnected2D(32, (3, 3))(x)
     x = ZeroPadding2D(padding=(1, 1))(x)
     x = MaxPooling2D((2, 2), padding='same')(x)
-    encoded_layer = ActivityRegularization(l1=0.0e-4, l2=0.0e-4)(x)
+    encoded_layer = ActivityRegularization(l1=l1, l2=l2)(x)
     return encoded_layer
 
 def sampling(args):
