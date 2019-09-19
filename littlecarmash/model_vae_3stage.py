@@ -17,7 +17,7 @@ from keras import backend as K
 
 def build_encoded_layer(size, in_channels=1, l1_l2=(0.0e-4, 0.0e-4), use_dropout=False):
     """Create encoded layer, prior to projection to latent space."""
-    input_img = Input(shape=(size, size, in_channels))
+    input_img = Input(shape=(size, size, in_channels), name='input_img')
 
     x = Conv2D(32, (3, 3), activation=relu, padding='same')(input_img)
     x = MaxPooling2D((2, 2), padding='same')(x)
