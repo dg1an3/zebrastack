@@ -15,7 +15,7 @@ from keras.losses import mse, binary_crossentropy
 from keras.utils import plot_model
 from keras import backend as K
 
-def build_encoded_layer(size, in_channels=1, latent_dim=8, l1_l2=(0.0e-4, 0.0e-4), use_dropout=False):
+def build_encoded_layer(size, in_channels=1, l1_l2=(0.0e-4, 0.0e-4), use_dropout=False):
     """Create encoded layer, prior to projection to latent space."""
     input_img = Input(shape=(size, size, in_channels))
 
