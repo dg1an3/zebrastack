@@ -53,14 +53,14 @@ class ProcessedImage:
             img = img / std
 
             # add to the cache
-            self.cache[(sz, color_model)] = img, (mean, std)
+            self.cache[(size, color_model)] = img, (mean, std)
         else:
             img, _ = self.cache[(size, color_model)]
         return img
 
     def reconstruct_from_predicted(self, predicted, color_model=ColorModel.GRAY):
-        sz = predicted.shape[0]
-        _, stats = self.cache[sz, color_model]
+        size = predicted.shape[0]
+        _, stats = self.cache[size, color_model]
         mean, std = stats
         reconst = predicted
         reconst = reconst * std
