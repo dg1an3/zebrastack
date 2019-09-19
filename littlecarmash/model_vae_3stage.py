@@ -36,7 +36,7 @@ def build_encoded_layer(size, in_channels=1, latent_dim=8, l1_l2=(0.0e-4, 0.0e-4
     x = MaxPooling2D((2, 2), padding='same')(x)
     l1, l2 = l1_l2
     encoded_layer = ActivityRegularization(l1=l1, l2=l2)(x)
-    return encoded_layer
+    return encoded_layer, input_img
 
 def sampling(args):
     """Reparameterization trick by sampling fr an isotropic unit Gaussian.
@@ -52,7 +52,7 @@ def sampling(args):
     epsilon = K.random_normal(shape=(batch, dim))
     return z_mean + K.exp(0.5 * z_log_var) * epsilon
 
-def build_latent_encoder(encoded_layer, latent_dim=8, dump=False):
+def build_latent_encoder(encoded_layer, input_img, latent_dim=8, dump=False):
     """Create projection to latent vector Q(z|X)."""
     x = Flatten()(encoded_layer)
     x = Dense(32, activation=relu)(x)
@@ -122,8 +122,8 @@ class ModelVae3Stage:
     """Wraps all three parts of the VAE model: encoder, decoder, and vae."""
 
     def __init__(self, in_channels=1, latent_dim=8, use_kldiv=False):
-        self.encoded_layer = build_encoder(size, in_channels, latent_dim)
-        self.encoder, z_mean, z_log_var = build_latent_encoder(self.encoded_layer)
+        encoded_layer, input_img = build_encoder(size, in_channels, latent_dim)
+        self.encoder, z_mean, z_log_var = build_latent_encoder(encoded_layer, input_img)
         
         # shape info needed to build decoder model
         encoded_shape = K.int_shape(encoded_layer)

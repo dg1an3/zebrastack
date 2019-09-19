@@ -46,15 +46,12 @@ class ProcessedImage:
 
             img = resize(img, (size, size), anti_aliasing=True)
 
+            mean, std = img.mean(), img.std()
             if color_model == ColorModel.GRAY:
-                img = img[..., 0]
-
-            # whiten the image
-            mean, std = img[:][:][:][0].mean(), img[:][:][:][0].std()
-            img = img - mean
-            img = img / std
-
-            # add to the cache
+                img = img[..., 0]                
+                img = np.clip(0.5 + (img - mean)/(2.0*std), 0.0, 1.0)
+            else:
+                throw_exception()
             self.cache[(size, color_model)] = img, (mean, std)
         else:
             img, _ = self.cache[(size, color_model)]
@@ -64,10 +61,7 @@ class ProcessedImage:
         size = predicted.shape[0]
         _, stats = self.cache[size, color_model]
         mean, std = stats
-        reconst = predicted
-        reconst = reconst * std
-        reconst = reconst - mean
-        return reconst
+        return (mean + predicted) * 2.0 * std
 
 def show_image_strip(imgs, axes, predicted_dict=None):
     """Shows a collection of images, and possibly their reconstruction, on a figure axes."""
