@@ -68,7 +68,7 @@ def build_latent_encoder(encoded_layer, latent_dim=8, dump=False):
         plot_model(encoder, to_file='data\dicom_encoder.png', show_shapes=True)
 
     # TODO: add threshold layer for sparsity test
-    return encoder
+    return encoder, z_mean, z_log_var
 
 def build_decoder(size, encoded_shape, in_channels=1, latent_dim=8, dump=False):
     """Create decoder from latent space back to grid."""
@@ -97,6 +97,15 @@ def build_decoder(size, encoded_shape, in_channels=1, latent_dim=8, dump=False):
 
     return decoder
 
+def vae_loss(z_mean, z_log_var):
+    """Compute the total VAE loss=binary loss + KLDiv.
+    # Arguments
+        ??? args (tensor): mean and log of variance of Q(z|X)
+    # Returns
+        ??? z (tensor): sampled latent vector    
+    """
+    return z_mean + K.exp(z_log_var)
+
 def build_autoencoder(encoder, decoder, optimizer='ada', loss='mse', dump=False):
     """builds an autoencoder from an encoder/decoder pair."""
     autoencoder_output = decoder(encoder(input_img)[2])
@@ -109,16 +118,20 @@ def build_autoencoder(encoder, decoder, optimizer='ada', loss='mse', dump=False)
     return autoencoder
 
 class ModelVae3Stage:
-    """ ModelVae3Stage """
+    """Wraps all three parts of the VAE model: encoder, decoder, and vae."""
 
-    def __init__(self, in_channels=1, latent_dim=8):
+    def __init__(self, in_channels=1, latent_dim=8, use_kldiv=False):
         self.encoded_layer = build_encoder(size, in_channels, latent_dim)
-        self.encoder = build_latent_encoder(self.encoded_layer)
+        self.encoder, z_mean, z_log_var = build_latent_encoder(self.encoded_layer)
         
         # shape info needed to build decoder model
         encoded_shape = K.int_shape(encoded_layer)
         self.decoder = build_decoder(size, encoded_shape, in_channels, latent_dim)
-        self.vae = build_autoencoder(self.encoder, self.decoder, optimizer='adadelta', loss='mse')
+        if use_kldiv:
+            loss = vae_loss(z_mean, z_log_var)
+        else:
+            loss = mse
+        self.vae = build_autoencoder(self.encoder, self.decoder, optimizer='adadelta', loss=loss)
 
     def __str__(self):
         # output as yaml
