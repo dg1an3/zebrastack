@@ -1,6 +1,0 @@
-def get_processed_dataset(label, size, hsv):
-
-    # TODO: what about whitening?
-    training = []
-    testing = []
-    return training, testing

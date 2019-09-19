@@ -15,7 +15,7 @@ from keras.losses import mse, binary_crossentropy
 from keras.utils import plot_model
 from keras import backend as K
 
-def build_encoded_layer(size, in_channels=1, latent_dim=8, l1=0.0e-4, l2=0.0e-4, use_dropout=False):
+def build_encoded_layer(size, in_channels=1, latent_dim=8, l1_l2=(0.0e-4, 0.0e-4), use_dropout=False):
     """Create encoded layer, prior to projection to latent space."""
     input_img = Input(shape=(size, size, in_channels))
 
@@ -34,6 +34,7 @@ def build_encoded_layer(size, in_channels=1, latent_dim=8, l1=0.0e-4, l2=0.0e-4,
     x = LocallyConnected2D(32, (3, 3))(x)
     x = ZeroPadding2D(padding=(1, 1))(x)
     x = MaxPooling2D((2, 2), padding='same')(x)
+    l1, l2 = l1_l2
     encoded_layer = ActivityRegularization(l1=l1, l2=l2)(x)
     return encoded_layer
 
@@ -65,7 +66,7 @@ def build_latent_encoder(encoded_layer, latent_dim=8, dump=False):
     encoder = Model(input_img, [z_mean, z_log_var, z], name='vae_encoder')
     if dump:
         encoder.summary()
-        plot_model(encoder, to_file='data\dicom_encoder.png', show_shapes=True)
+        plot_model(encoder, to_file='dicom_encoder.png', show_shapes=True)
 
     # TODO: add threshold layer for sparsity test
     return encoder, z_mean, z_log_var
@@ -93,7 +94,7 @@ def build_decoder(size, encoded_shape, in_channels=1, latent_dim=8, dump=False):
     decoder = Model(latent_inputs, decoded_layer, name='vae_decoder')
     if dump:
         decoder.summary()
-        plot_model(decoder, to_file='data\dicom_decoder.png', show_shapes=True)
+        plot_model(decoder, to_file='dicom_decoder.png', show_shapes=True)
 
     return decoder
 
@@ -114,7 +115,7 @@ def build_autoencoder(encoder, decoder, optimizer='ada', loss='mse', dump=False)
     autoencoder.compile(optimizer=optimizer, loss=loss)
     if dump:
         autoencoder.summary()
-        plot_model(autoencoder, to_file='data\dicom_autoencoder.png', show_shapes=True)
+        plot_model(autoencoder, to_file='dicom_autoencoder.png', show_shapes=True)
     return autoencoder
 
 class ModelVae3Stage:
