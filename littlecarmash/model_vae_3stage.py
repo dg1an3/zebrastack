@@ -127,6 +127,7 @@ class ModelVae3Stage:
     """
 
     def __init__(self, size=64, in_channels=1, latent_dim=8, use_kldiv=False):
+        # TODO: try to read stored model, if available
         encoded_layer, input_img = \
             build_encoded_layer(size, in_channels=in_channels)
         self.encoder, z_mean, z_log_var = \
@@ -154,6 +155,7 @@ class ModelVae3Stage:
         self.vae.train(x_train, x_train, 
                        epochs=epochs, batch_size=256, 
                        shuffle=True, validation_data=(x_test, x_test))
+        # TODO: write out saved model after each training
 
     def predict(self, x_test):
         return self.vae.predict(x_test)
