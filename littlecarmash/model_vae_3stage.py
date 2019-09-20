@@ -1,6 +1,7 @@
 """ model_vae_3stage module
 encapsulates VAE model in a class
 """
+import random
 
 from keras.activations import relu, sigmoid
 from keras.layers import Dense, Input, SpatialDropout2D
@@ -107,7 +108,7 @@ def vae_loss(z_mean, z_log_var):
     """
     return z_mean + K.exp(z_log_var)
 
-def build_autoencoder(encoder, decoder, optimizer='ada', loss='mse', dump=False):
+def build_autoencoder(encoder, decoder, input_img, optimizer='ada', loss='mse', dump=False):
     """builds an autoencoder from an encoder/decoder pair."""
     autoencoder_output = decoder(encoder(input_img)[2])
 
@@ -119,27 +120,40 @@ def build_autoencoder(encoder, decoder, optimizer='ada', loss='mse', dump=False)
     return autoencoder
 
 class ModelVae3Stage:
-    """Wraps all three parts of the VAE model: encoder, decoder, and vae."""
+    """
+    Wraps all three parts of the VAE model: encoder, decoder, and vae.
+    * Arguments: else
+    """
 
     def __init__(self, in_channels=1, latent_dim=8, use_kldiv=False):
-        encoded_layer, input_img = build_encoder(size, in_channels, latent_dim)
-        self.encoder, z_mean, z_log_var = build_latent_encoder(encoded_layer, input_img)
+        encoded_layer, input_img = \
+            build_encoded_layer(size, 
+                                in_channels=in_channels, latent_dim=latent_dim)
+        self.encoder, z_mean, z_log_var = \
+            build_latent_encoder(encoded_layer, input_img)
         
         # shape info needed to build decoder model
         encoded_shape = K.int_shape(encoded_layer)
-        self.decoder = build_decoder(size, encoded_shape, in_channels, latent_dim)
+        self.decoder = \
+            build_decoder(size, encoded_shape, in_channels, latent_dim)
+
         if use_kldiv:
             loss = vae_loss(z_mean, z_log_var)
         else:
             loss = mse
-        self.vae = build_autoencoder(self.encoder, self.decoder, optimizer='adadelta', loss=loss)
+        self.vae = \
+            build_autoencoder(self.encoder, self.decoder, 
+                              optimizer='adadelta', loss=loss)
 
     def __str__(self):
         # output as yaml
         return 'Model3StageVae'
 
-    def train(self, x_train, epochs):
-        self.vae.train(x_train, x_train, epochs=epochs, batch_size=256)
+    def train(self, x_train, epochs=1000):
+        x_test = np.array(random.sample(list(x_train), int(len(x_train)/10))) 
+        self.vae.train(x_train, x_train, 
+                       epochs=epochs, batch_size=256, 
+                       shuffle=True, validation_data=(x_test, x_test))
 
     def predict(self, x_test):
         return self.vae.predict(x_test)
