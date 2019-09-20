@@ -1,6 +1,7 @@
 """ model_vae_3stage module
 encapsulates VAE model in a class
 """
+
 import random
 
 from keras.activations import relu, sigmoid
@@ -125,10 +126,9 @@ class ModelVae3Stage:
     * Arguments: else
     """
 
-    def __init__(self, in_channels=1, latent_dim=8, use_kldiv=False):
+    def __init__(self, size=64, in_channels=1, latent_dim=8, use_kldiv=False):
         encoded_layer, input_img = \
-            build_encoded_layer(size, 
-                                in_channels=in_channels, latent_dim=latent_dim)
+            build_encoded_layer(size, in_channels=in_channels)
         self.encoder, z_mean, z_log_var = \
             build_latent_encoder(encoded_layer, input_img)
         
@@ -142,7 +142,7 @@ class ModelVae3Stage:
         else:
             loss = mse
         self.vae = \
-            build_autoencoder(self.encoder, self.decoder, 
+            build_autoencoder(self.encoder, self.decoder, input_img,
                               optimizer='adadelta', loss=loss)
 
     def __str__(self):
