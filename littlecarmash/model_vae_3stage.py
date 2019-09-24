@@ -100,21 +100,49 @@ def build_decoder(size, encoded_shape, in_channels=1, latent_dim=8, dump=False):
 
     return decoder
 
-def vae_loss(z_mean, z_log_var):
+def vae_loss(inputs, outputs, z_mean, z_log_var, xent=True, kldiv=False):
     """Compute the total VAE loss=binary loss + KLDiv.
     # Arguments
-        ??? args (tensor): mean and log of variance of Q(z|X)
+        inputs:
+        outputs:
+        z_mean:
+        z_log_var:
+        xent:
     # Returns
         ??? z (tensor): sampled latent vector    
     """
-    return z_mean + K.exp(z_log_var)
 
-def build_autoencoder(encoder, decoder, input_img, optimizer='ada', loss='mse', dump=False):
+    # VAE loss = mse_loss or xent_loss + kl_loss
+    if xent:
+        reconstruction_loss = binary_crossentropy(inputs, outputs)
+    else:
+        reconstruction_loss = mse(inputs, outputs)
+    if kldiv:
+        kl_loss = 1 + z_log_var - K.square(z_mean) - K.exp(z_log_var)
+        kl_loss = K.sum(kl_loss, axis=-1)
+        kl_loss *= -0.5
+        vae_loss = K.mean(reconstruction_loss + kl_loss)
+    else:
+        vae_loss = reconstruction_loss
+    return vae_loss
+
+def build_autoencoder(encoder, decoder, input_img, z_mean, z_log_var, optimizer='ada', loss='mse', dump=False):
     """builds an autoencoder from an encoder/decoder pair."""
     autoencoder_output = decoder(encoder(input_img)[2])
-
     autoencoder = Model(input_img, autoencoder_output, name='vae')
-    autoencoder.compile(optimizer=optimizer, loss=loss)
+
+    loss = vae_loss(input_img, autoencoder_output, z_mean, z_log_var, xent=False, kldiv=True)
+    loss = mse(input_img, autoencoder_output)
+
+    # Compute VAE loss
+    def my_vae_loss(y_true, y_pred):
+        img_rows, img_cols = 128, 128
+        xent_loss = img_rows * img_cols * binary_crossentropy(K.flatten(y_true), K.flatten(y_pred))
+        kl_loss = - 0.5 * K.sum(1 + z_log_var - K.square(z_mean) - K.exp(z_log_var), axis=-1)
+        vae_loss = K.mean(xent_loss + kl_loss)
+        return vae_loss
+
+    autoencoder.compile(optimizer=optimizer, loss=my_vae_loss)
     if dump:
         autoencoder.summary()
         plot_model(autoencoder, to_file='dicom_autoencoder.png', show_shapes=True)
@@ -126,7 +154,7 @@ class ModelVae3Stage:
     * Arguments: else
     """
 
-    def __init__(self, size=64, in_channels=1, latent_dim=8, use_kldiv=False):
+    def __init__(self, size=64, in_channels=1, latent_dim=8, use_kldiv=True):
         # TODO: try to read stored model, if available
         encoded_layer, input_img = \
             build_encoded_layer(size, in_channels=in_channels)
@@ -138,13 +166,10 @@ class ModelVae3Stage:
         self.decoder = \
             build_decoder(size, encoded_shape, in_channels, latent_dim)
 
-        if use_kldiv:
-            loss = vae_loss(z_mean, z_log_var)
-        else:
-            loss = mse
+        # loss = vae_loss(input_img, self.decoder, z_mean, z_log_var, xent=False, kldiv=use_kldiv)
         self.vae = \
-            build_autoencoder(self.encoder, self.decoder, input_img,
-                              optimizer='adadelta', loss=loss)
+            build_autoencoder(self.encoder, self.decoder, input_img, z_mean, z_log_var,
+                              optimizer='adadelta')
 
     def __str__(self):
         # output as yaml
