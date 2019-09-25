@@ -33,6 +33,9 @@ def build_encoded_layer(size, in_channels=1, l1_l2=(0.0e-4, 0.0e-4), use_dropout
     x = Conv2D(32, (3, 3), activation=relu, padding='same')(x)
     x = MaxPooling2D((2, 2), padding='same')(x)
 
+    x = Conv2D(32, (3, 3), activation=relu, padding='same')(x)
+    x = MaxPooling2D((2, 2), padding='same')(x)
+
     x = LocallyConnected2D(32, (3, 3))(x)
     x = ZeroPadding2D(padding=(1, 1))(x)
     x = MaxPooling2D((2, 2), padding='same')(x)
@@ -92,6 +95,9 @@ def build_decoder(size, encoded_shape, in_channels=1, latent_dim=8, dump=False):
     x = Conv2DTranspose(32, (3,3), activation=relu, padding='same')(x)
 
     x = UpSampling2D((2,2))(x)
+    x = Conv2DTranspose(32, (3,3), activation=relu, padding='same')(x)
+
+    x = UpSampling2D((2,2))(x)
     decoded_layer = Conv2D(1, (3,3), activation=sigmoid, padding='same')(x)
     decoder = Model(latent_inputs, decoded_layer, name='vae_decoder')
     if dump:
@@ -135,6 +141,7 @@ def build_autoencoder(encoder, decoder, input_img, z_mean, z_log_var, optimizer=
     loss = mse(input_img, autoencoder_output)
 
     # Compute VAE loss
+    # TODO: move this to Class
     def my_vae_loss(y_true, y_pred):
         img_rows, img_cols = 128, 128
         xent_loss = img_rows * img_cols * binary_crossentropy(K.flatten(y_true), K.flatten(y_pred))
@@ -159,12 +166,12 @@ class ModelVae3Stage:
         encoded_layer, input_img = \
             build_encoded_layer(size, in_channels=in_channels)
         self.encoder, z_mean, z_log_var = \
-            build_latent_encoder(encoded_layer, input_img)
+            build_latent_encoder(encoded_layer, input_img, latent_dim=latent_dim)
         
         # shape info needed to build decoder model
         encoded_shape = K.int_shape(encoded_layer)
         self.decoder = \
-            build_decoder(size, encoded_shape, in_channels, latent_dim)
+            build_decoder(size, encoded_shape, in_channels, latent_dim=latent_dim)
 
         # loss = vae_loss(input_img, self.decoder, z_mean, z_log_var, xent=False, kldiv=use_kldiv)
         self.vae = \
