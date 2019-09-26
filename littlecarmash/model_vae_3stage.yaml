@@ -46,7 +46,7 @@ config:
           dilation_rate: &id003 !!python/tuple
           - 1
           - 1
-          filters: 32
+          filters: 8
           kernel_constraint: null
           kernel_initializer:
             class_name: VarianceScaling
@@ -59,7 +59,7 @@ config:
           kernel_size: !!python/tuple
           - 3
           - 3
-          name: conv2d_1
+          name: conv2d_10
           padding: same
           strides: &id004 !!python/tuple
           - 1
@@ -71,11 +71,11 @@ config:
             - 0
             - 0
             - {}
-        name: conv2d_1
+        name: conv2d_10
       - class_name: MaxPooling2D
         config:
           data_format: channels_last
-          name: max_pooling2d_1
+          name: max_pooling2d_6
           padding: same
           pool_size: &id002 !!python/tuple
           - 2
@@ -83,11 +83,24 @@ config:
           strides: *id002
           trainable: true
         inbound_nodes:
-        - - - conv2d_1
+        - - - conv2d_10
             - 0
             - 0
             - {}
-        name: max_pooling2d_1
+        name: max_pooling2d_6
+      - class_name: SpatialDropout2D
+        config:
+          name: spatial_dropout2d_2
+          noise_shape: null
+          rate: 0.1
+          seed: null
+          trainable: true
+        inbound_nodes:
+        - - - max_pooling2d_6
+            - 0
+            - 0
+            - {}
+        name: spatial_dropout2d_2
       - class_name: Conv2D
         config:
           activation: relu
@@ -99,7 +112,7 @@ config:
           bias_regularizer: null
           data_format: channels_last
           dilation_rate: *id003
-          filters: 32
+          filters: 16
           kernel_constraint: null
           kernel_initializer:
             class_name: VarianceScaling
@@ -112,21 +125,21 @@ config:
           kernel_size: !!python/tuple
           - 3
           - 3
-          name: conv2d_2
+          name: conv2d_11
           padding: same
           strides: *id004
           trainable: true
           use_bias: true
         inbound_nodes:
-        - - - max_pooling2d_1
+        - - - spatial_dropout2d_2
             - 0
             - 0
             - {}
-        name: conv2d_2
+        name: conv2d_11
       - class_name: MaxPooling2D
         config:
           data_format: channels_last
-          name: max_pooling2d_2
+          name: max_pooling2d_7
           padding: same
           pool_size: &id005 !!python/tuple
           - 2
@@ -134,11 +147,62 @@ config:
           strides: *id005
           trainable: true
         inbound_nodes:
-        - - - conv2d_2
+        - - - conv2d_11
             - 0
             - 0
             - {}
-        name: max_pooling2d_2
+        name: max_pooling2d_7
+      - class_name: Conv2D
+        config:
+          activation: relu
+          activity_regularizer: null
+          bias_constraint: null
+          bias_initializer:
+            class_name: Zeros
+            config: {}
+          bias_regularizer: null
+          data_format: channels_last
+          dilation_rate: *id003
+          filters: 16
+          kernel_constraint: null
+          kernel_initializer:
+            class_name: VarianceScaling
+            config:
+              distribution: uniform
+              mode: fan_avg
+              scale: 1.0
+              seed: null
+          kernel_regularizer: null
+          kernel_size: !!python/tuple
+          - 3
+          - 3
+          name: conv2d_12
+          padding: same
+          strides: *id004
+          trainable: true
+          use_bias: true
+        inbound_nodes:
+        - - - max_pooling2d_7
+            - 0
+            - 0
+            - {}
+        name: conv2d_12
+      - class_name: MaxPooling2D
+        config:
+          data_format: channels_last
+          name: max_pooling2d_8
+          padding: same
+          pool_size: &id006 !!python/tuple
+          - 2
+          - 2
+          strides: *id006
+          trainable: true
+        inbound_nodes:
+        - - - conv2d_12
+            - 0
+            - 0
+            - {}
+        name: max_pooling2d_8
       - class_name: Conv2D
         config:
           activation: relu
@@ -163,33 +227,33 @@ config:
           kernel_size: !!python/tuple
           - 3
           - 3
-          name: conv2d_3
+          name: conv2d_13
           padding: same
           strides: *id004
           trainable: true
           use_bias: true
         inbound_nodes:
-        - - - max_pooling2d_2
+        - - - max_pooling2d_8
             - 0
             - 0
             - {}
-        name: conv2d_3
+        name: conv2d_13
       - class_name: MaxPooling2D
         config:
           data_format: channels_last
-          name: max_pooling2d_3
+          name: max_pooling2d_9
           padding: same
-          pool_size: &id006 !!python/tuple
+          pool_size: &id007 !!python/tuple
           - 2
           - 2
-          strides: *id006
+          strides: *id007
           trainable: true
         inbound_nodes:
-        - - - conv2d_3
+        - - - conv2d_13
             - 0
             - 0
             - {}
-        name: max_pooling2d_3
+        name: max_pooling2d_9
       - class_name: LocallyConnected2D
         config:
           activation: linear
@@ -213,23 +277,23 @@ config:
           kernel_size: !!python/tuple
           - 3
           - 3
-          name: locally_connected2d_1
+          name: locally_connected2d_3
           padding: valid
-          strides: &id009 !!python/tuple
+          strides: &id010 !!python/tuple
           - 1
           - 1
           trainable: true
           use_bias: true
         inbound_nodes:
-        - - - max_pooling2d_3
+        - - - max_pooling2d_9
             - 0
             - 0
             - {}
-        name: locally_connected2d_1
+        name: locally_connected2d_3
       - class_name: ZeroPadding2D
         config:
           data_format: channels_last
-          name: zero_padding2d_1
+          name: zero_padding2d_3
           padding: !!python/tuple
           - !!python/tuple
             - 1
@@ -239,50 +303,50 @@ config:
             - 1
           trainable: true
         inbound_nodes:
-        - - - locally_connected2d_1
+        - - - locally_connected2d_3
             - 0
             - 0
             - {}
-        name: zero_padding2d_1
+        name: zero_padding2d_3
       - class_name: MaxPooling2D
         config:
           data_format: channels_last
-          name: max_pooling2d_4
+          name: max_pooling2d_10
           padding: same
-          pool_size: &id007 !!python/tuple
+          pool_size: &id008 !!python/tuple
           - 2
           - 2
-          strides: *id007
+          strides: *id008
           trainable: true
         inbound_nodes:
-        - - - zero_padding2d_1
+        - - - zero_padding2d_3
             - 0
             - 0
             - {}
-        name: max_pooling2d_4
+        name: max_pooling2d_10
       - class_name: ActivityRegularization
         config:
           l1: 0.0
           l2: 0.0
-          name: activity_regularization_1
+          name: activity_regularization_2
           trainable: true
         inbound_nodes:
-        - - - max_pooling2d_4
+        - - - max_pooling2d_10
             - 0
             - 0
             - {}
-        name: activity_regularization_1
+        name: activity_regularization_2
       - class_name: Flatten
         config:
           data_format: channels_last
-          name: flatten_1
+          name: flatten_2
           trainable: true
         inbound_nodes:
-        - - - activity_regularization_1
+        - - - activity_regularization_2
             - 0
             - 0
             - {}
-        name: flatten_1
+        name: flatten_2
       - class_name: Dense
         config:
           activation: relu
@@ -301,16 +365,16 @@ config:
               scale: 1.0
               seed: null
           kernel_regularizer: null
-          name: dense_1
+          name: dense_3
           trainable: true
           units: 32
           use_bias: true
         inbound_nodes:
-        - - - flatten_1
+        - - - flatten_2
             - 0
             - 0
             - {}
-        name: dense_1
+        name: dense_3
       - class_name: Dense
         config:
           activation: linear
@@ -331,10 +395,10 @@ config:
           kernel_regularizer: null
           name: z_mean
           trainable: true
-          units: 8
+          units: 16
           use_bias: true
         inbound_nodes:
-        - - - dense_1
+        - - - dense_3
             - 0
             - 0
             - {}
@@ -359,10 +423,10 @@ config:
           kernel_regularizer: null
           name: z_log_var
           trainable: true
-          units: 8
+          units: 16
           use_bias: true
         inbound_nodes:
-        - - - dense_1
+        - - - dense_3
             - 0
             - 0
             - {}
@@ -387,7 +451,7 @@ config:
 
             dmFy2gViYXRjaNoDZGlt2gdlcHNpbG9uqQByDwAAAPo2RTpcZGV2XGxpdHRsZWNhcm1hc2hcbGl0
 
-            dGxlY2FybWFzaFxtb2RlbF92YWVfM3N0YWdlLnB52ghzYW1wbGluZysAAABzCgAAAAAHCAEOAQ4C
+            dGxlY2FybWFzaFxtb2RlbF92YWVfM3N0YWdlLnB52ghzYW1wbGluZy0AAABzCgAAAAAHCAEOAQ4C
 
             EAE=
 
@@ -397,18 +461,18 @@ config:
           function_type: lambda
           name: z
           output_shape: !!python/tuple
-          - 8
+          - 16
           output_shape_type: raw
           trainable: true
         inbound_nodes:
         - - - z_mean
             - 0
             - 0
-            - &id008 {}
+            - &id009 {}
           - - z_log_var
             - 0
             - 0
-            - *id008
+            - *id009
         name: z
       name: vae_encoder
       output_layers:
@@ -438,7 +502,7 @@ config:
         config:
           batch_input_shape: !!python/tuple
           - null
-          - 8
+          - 16
           dtype: float32
           name: z_sampling
           sparse: false
@@ -462,30 +526,30 @@ config:
               scale: 1.0
               seed: null
           kernel_regularizer: null
-          name: dense_2
+          name: dense_4
           trainable: true
-          units: 2048
+          units: 512
           use_bias: true
         inbound_nodes:
         - - - z_sampling
             - 0
             - 0
             - {}
-        name: dense_2
+        name: dense_4
       - class_name: Reshape
         config:
-          name: reshape_1
+          name: reshape_2
           target_shape: !!python/tuple
-          - 8
-          - 8
+          - 4
+          - 4
           - 32
           trainable: true
         inbound_nodes:
-        - - - dense_2
+        - - - dense_4
             - 0
             - 0
             - {}
-        name: reshape_1
+        name: reshape_2
       - class_name: LocallyConnected2D
         config:
           activation: linear
@@ -509,21 +573,21 @@ config:
           kernel_size: !!python/tuple
           - 3
           - 3
-          name: locally_connected2d_2
+          name: locally_connected2d_4
           padding: valid
-          strides: *id009
+          strides: *id010
           trainable: true
           use_bias: true
         inbound_nodes:
-        - - - reshape_1
+        - - - reshape_2
             - 0
             - 0
             - {}
-        name: locally_connected2d_2
+        name: locally_connected2d_4
       - class_name: ZeroPadding2D
         config:
           data_format: channels_last
-          name: zero_padding2d_2
+          name: zero_padding2d_4
           padding: !!python/tuple
           - !!python/tuple
             - 1
@@ -533,27 +597,27 @@ config:
             - 1
           trainable: true
         inbound_nodes:
-        - - - locally_connected2d_2
+        - - - locally_connected2d_4
             - 0
             - 0
             - {}
-        name: zero_padding2d_2
+        name: zero_padding2d_4
       - class_name: UpSampling2D
         config:
           data_format: channels_last
           interpolation: nearest
-          name: up_sampling2d_1
+          name: up_sampling2d_6
           size: !!python/tuple
           - 2
           - 2
           trainable: true
         inbound_nodes:
-        - - - zero_padding2d_2
+        - - - zero_padding2d_4
             - 0
             - 0
             - {}
-        name: up_sampling2d_1
-      - class_name: Conv2DTranspose
+        name: up_sampling2d_6
+      - class_name: Conv2D
         config:
           activation: relu
           activity_regularizer: null
@@ -563,9 +627,7 @@ config:
             config: {}
           bias_regularizer: null
           data_format: channels_last
-          dilation_rate: &id010 !!python/tuple
-          - 1
-          - 1
+          dilation_rate: *id003
           filters: 32
           kernel_constraint: null
           kernel_initializer:
@@ -579,36 +641,33 @@ config:
           kernel_size: !!python/tuple
           - 3
           - 3
-          name: conv2d_transpose_1
-          output_padding: null
+          name: conv2d_14
           padding: same
-          strides: &id011 !!python/tuple
-          - 1
-          - 1
+          strides: *id004
           trainable: true
           use_bias: true
         inbound_nodes:
-        - - - up_sampling2d_1
+        - - - up_sampling2d_6
             - 0
             - 0
             - {}
-        name: conv2d_transpose_1
+        name: conv2d_14
       - class_name: UpSampling2D
         config:
           data_format: channels_last
           interpolation: nearest
-          name: up_sampling2d_2
+          name: up_sampling2d_7
           size: !!python/tuple
           - 2
           - 2
           trainable: true
         inbound_nodes:
-        - - - conv2d_transpose_1
+        - - - conv2d_14
             - 0
             - 0
             - {}
-        name: up_sampling2d_2
-      - class_name: Conv2DTranspose
+        name: up_sampling2d_7
+      - class_name: Conv2D
         config:
           activation: relu
           activity_regularizer: null
@@ -618,8 +677,8 @@ config:
             config: {}
           bias_regularizer: null
           data_format: channels_last
-          dilation_rate: *id010
-          filters: 32
+          dilation_rate: *id003
+          filters: 16
           kernel_constraint: null
           kernel_initializer:
             class_name: VarianceScaling
@@ -632,34 +691,33 @@ config:
           kernel_size: !!python/tuple
           - 3
           - 3
-          name: conv2d_transpose_2
-          output_padding: null
+          name: conv2d_15
           padding: same
-          strides: *id011
+          strides: *id004
           trainable: true
           use_bias: true
         inbound_nodes:
-        - - - up_sampling2d_2
+        - - - up_sampling2d_7
             - 0
             - 0
             - {}
-        name: conv2d_transpose_2
+        name: conv2d_15
       - class_name: UpSampling2D
         config:
           data_format: channels_last
           interpolation: nearest
-          name: up_sampling2d_3
+          name: up_sampling2d_8
           size: !!python/tuple
           - 2
           - 2
           trainable: true
         inbound_nodes:
-        - - - conv2d_transpose_2
+        - - - conv2d_15
             - 0
             - 0
             - {}
-        name: up_sampling2d_3
-      - class_name: Conv2DTranspose
+        name: up_sampling2d_8
+      - class_name: Conv2D
         config:
           activation: relu
           activity_regularizer: null
@@ -669,8 +727,8 @@ config:
             config: {}
           bias_regularizer: null
           data_format: channels_last
-          dilation_rate: *id010
-          filters: 32
+          dilation_rate: *id003
+          filters: 16
           kernel_constraint: null
           kernel_initializer:
             class_name: VarianceScaling
@@ -683,33 +741,82 @@ config:
           kernel_size: !!python/tuple
           - 3
           - 3
-          name: conv2d_transpose_3
-          output_padding: null
+          name: conv2d_16
           padding: same
-          strides: *id011
+          strides: *id004
           trainable: true
           use_bias: true
         inbound_nodes:
-        - - - up_sampling2d_3
+        - - - up_sampling2d_8
             - 0
             - 0
             - {}
-        name: conv2d_transpose_3
+        name: conv2d_16
       - class_name: UpSampling2D
         config:
           data_format: channels_last
           interpolation: nearest
-          name: up_sampling2d_4
+          name: up_sampling2d_9
           size: !!python/tuple
           - 2
           - 2
           trainable: true
         inbound_nodes:
-        - - - conv2d_transpose_3
+        - - - conv2d_16
             - 0
             - 0
             - {}
-        name: up_sampling2d_4
+        name: up_sampling2d_9
+      - class_name: Conv2D
+        config:
+          activation: relu
+          activity_regularizer: null
+          bias_constraint: null
+          bias_initializer:
+            class_name: Zeros
+            config: {}
+          bias_regularizer: null
+          data_format: channels_last
+          dilation_rate: *id003
+          filters: 8
+          kernel_constraint: null
+          kernel_initializer:
+            class_name: VarianceScaling
+            config:
+              distribution: uniform
+              mode: fan_avg
+              scale: 1.0
+              seed: null
+          kernel_regularizer: null
+          kernel_size: !!python/tuple
+          - 3
+          - 3
+          name: conv2d_17
+          padding: same
+          strides: *id004
+          trainable: true
+          use_bias: true
+        inbound_nodes:
+        - - - up_sampling2d_9
+            - 0
+            - 0
+            - {}
+        name: conv2d_17
+      - class_name: UpSampling2D
+        config:
+          data_format: channels_last
+          interpolation: nearest
+          name: up_sampling2d_10
+          size: !!python/tuple
+          - 2
+          - 2
+          trainable: true
+        inbound_nodes:
+        - - - conv2d_17
+            - 0
+            - 0
+            - {}
+        name: up_sampling2d_10
       - class_name: Conv2D
         config:
           activation: sigmoid
@@ -734,20 +841,20 @@ config:
           kernel_size: !!python/tuple
           - 3
           - 3
-          name: conv2d_4
+          name: conv2d_18
           padding: same
           strides: *id004
           trainable: true
           use_bias: true
         inbound_nodes:
-        - - - up_sampling2d_4
+        - - - up_sampling2d_10
             - 0
             - 0
             - {}
-        name: conv2d_4
+        name: conv2d_18
       name: vae_decoder
       output_layers:
-      - - conv2d_4
+      - - conv2d_18
         - 0
         - 0
     inbound_nodes:

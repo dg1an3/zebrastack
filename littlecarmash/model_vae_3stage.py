@@ -10,26 +10,26 @@ from keras.layers import Conv2D, Flatten, Lambda
 from keras.layers import LocallyConnected2D, ZeroPadding2D
 from keras.layers import MaxPooling2D, UpSampling2D
 from keras.layers import Reshape, Conv2DTranspose
-from keras.layers import ActivityRegularization
+from keras.layers import ActivityRegularization, Activation
 
 from keras.models import Model
 from keras.losses import mse, binary_crossentropy
 from keras.utils import plot_model
 from keras import backend as K
 
-def build_encoded_layer(size, in_channels=1, l1_l2=(0.0e-4, 0.0e-4), use_dropout=False):
+def build_encoded_layer(size, in_channels=1, l1_l2=(0.0e-4, 0.0e-4), use_dropout=True):
     """Create encoded layer, prior to projection to latent space."""
     input_img = Input(shape=(size, size, in_channels), name='input_img')
 
-    x = Conv2D(32, (3, 3), activation=relu, padding='same')(input_img)
+    x = Conv2D(8, (3, 3), activation=relu, padding='same')(input_img)
     x = MaxPooling2D((2, 2), padding='same')(x)
 
     if use_dropout:
         x = SpatialDropout2D(0.1)(x)
-    x = Conv2D(32, (3, 3), activation=relu, padding='same')(x)
+    x = Conv2D(16, (3, 3), activation=relu, padding='same')(x)
     x = MaxPooling2D((2, 2), padding='same')(x)
 
-    x = Conv2D(32, (3, 3), activation=relu, padding='same')(x)
+    x = Conv2D(16, (3, 3), activation=relu, padding='same')(x)
     x = MaxPooling2D((2, 2), padding='same')(x)
 
     x = Conv2D(32, (3, 3), activation=relu, padding='same')(x)
@@ -85,18 +85,19 @@ def build_decoder(size, encoded_shape, in_channels=1, latent_dim=8, dump=False):
     x = ZeroPadding2D(padding=(1,1))(x)
 
     x = UpSampling2D((2,2))(x)
-    x = Conv2DTranspose(32, (3,3), activation=relu, padding='same')(x)
+    x = Conv2D(32, (3,3), activation=relu, padding='same')(x)
 
     x = UpSampling2D((2,2))(x)
-    x = Conv2DTranspose(32, (3,3), activation=relu, padding='same')(x)
+    x = Conv2D(16, (3,3), activation=relu, padding='same')(x)
 
     x = UpSampling2D((2,2))(x)
-    x = Conv2DTranspose(32, (3,3), activation=relu, padding='same')(x)
+    x = Conv2D(16, (3,3), activation=relu, padding='same')(x)
 
     x = UpSampling2D((2,2))(x)
-    x = Conv2DTranspose(32, (3,3), activation=relu, padding='same')(x)
+    x = Conv2D(8, (3,3), activation=relu, padding='same')(x)
 
     x = UpSampling2D((2,2))(x)
+    # can't use Activation(sigmoid)(x) because we need a conv layer to reduce 4-channels to 1-channel
     decoded_layer = Conv2D(1, (3,3), activation=sigmoid, padding='same')(x)
     decoder = Model(latent_inputs, decoded_layer, name='vae_decoder')
     if dump:
