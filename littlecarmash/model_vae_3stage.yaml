@@ -10,8 +10,8 @@ config:
     config:
       batch_input_shape: &id001 !!python/tuple
       - null
-      - 128
-      - 128
+      - 256
+      - 256
       - 1
       dtype: float32
       name: input_img
@@ -528,7 +528,7 @@ config:
           kernel_regularizer: null
           name: dense_2
           trainable: true
-          units: 512
+          units: 2048
           use_bias: true
         inbound_nodes:
         - - - z_sampling
@@ -540,8 +540,8 @@ config:
         config:
           name: reshape_1
           target_shape: !!python/tuple
-          - 4
-          - 4
+          - 8
+          - 8
           - 32
           trainable: true
         inbound_nodes:
@@ -819,7 +819,7 @@ config:
         name: up_sampling2d_5
       - class_name: Conv2D
         config:
-          activation: sigmoid
+          activation: relu
           activity_regularizer: null
           bias_constraint: null
           bias_initializer:

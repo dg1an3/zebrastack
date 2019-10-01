@@ -98,7 +98,7 @@ def build_decoder(size, encoded_shape, in_channels=1, latent_dim=8, dump=False):
 
     x = UpSampling2D((2,2))(x)
     # can't use Activation(sigmoid)(x) because we need a conv layer to reduce 4-channels to 1-channel
-    decoded_layer = Conv2D(1, (3,3), activation=sigmoid, padding='same')(x)
+    decoded_layer = Conv2D(1, (3,3), activation=relu, padding='same')(x)
     decoder = Model(latent_inputs, decoded_layer, name='vae_decoder')
     if dump:
         decoder.summary()
