@@ -46,20 +46,18 @@ config:
           dilation_rate: &id003 !!python/tuple
           - 1
           - 1
+          dtype: float32
           filters: 8
           kernel_constraint: null
           kernel_initializer:
-            class_name: VarianceScaling
+            class_name: GlorotUniform
             config:
-              distribution: uniform
-              mode: fan_avg
-              scale: 1.0
               seed: null
           kernel_regularizer: null
           kernel_size: !!python/tuple
           - 3
           - 3
-          name: conv2d_1
+          name: conv2d
           padding: same
           strides: &id004 !!python/tuple
           - 1
@@ -71,11 +69,12 @@ config:
             - 0
             - 0
             - {}
-        name: conv2d_1
+        name: conv2d
       - class_name: MaxPooling2D
         config:
           data_format: channels_last
-          name: max_pooling2d_1
+          dtype: float32
+          name: max_pooling2d
           padding: same
           pool_size: &id002 !!python/tuple
           - 2
@@ -83,24 +82,25 @@ config:
           strides: *id002
           trainable: true
         inbound_nodes:
-        - - - conv2d_1
+        - - - conv2d
             - 0
             - 0
             - {}
-        name: max_pooling2d_1
+        name: max_pooling2d
       - class_name: SpatialDropout2D
         config:
-          name: spatial_dropout2d_1
+          dtype: float32
+          name: spatial_dropout2d
           noise_shape: null
           rate: 0.1
           seed: null
           trainable: true
         inbound_nodes:
-        - - - max_pooling2d_1
+        - - - max_pooling2d
             - 0
             - 0
             - {}
-        name: spatial_dropout2d_1
+        name: spatial_dropout2d
       - class_name: Conv2D
         config:
           activation: relu
@@ -112,14 +112,62 @@ config:
           bias_regularizer: null
           data_format: channels_last
           dilation_rate: *id003
+          dtype: float32
           filters: 16
           kernel_constraint: null
           kernel_initializer:
-            class_name: VarianceScaling
+            class_name: GlorotUniform
             config:
-              distribution: uniform
-              mode: fan_avg
-              scale: 1.0
+              seed: null
+          kernel_regularizer: null
+          kernel_size: !!python/tuple
+          - 3
+          - 3
+          name: conv2d_1
+          padding: same
+          strides: *id004
+          trainable: true
+          use_bias: true
+        inbound_nodes:
+        - - - spatial_dropout2d
+            - 0
+            - 0
+            - {}
+        name: conv2d_1
+      - class_name: MaxPooling2D
+        config:
+          data_format: channels_last
+          dtype: float32
+          name: max_pooling2d_1
+          padding: same
+          pool_size: &id005 !!python/tuple
+          - 2
+          - 2
+          strides: *id005
+          trainable: true
+        inbound_nodes:
+        - - - conv2d_1
+            - 0
+            - 0
+            - {}
+        name: max_pooling2d_1
+      - class_name: Conv2D
+        config:
+          activation: relu
+          activity_regularizer: null
+          bias_constraint: null
+          bias_initializer:
+            class_name: Zeros
+            config: {}
+          bias_regularizer: null
+          data_format: channels_last
+          dilation_rate: *id003
+          dtype: float32
+          filters: 16
+          kernel_constraint: null
+          kernel_initializer:
+            class_name: GlorotUniform
+            config:
               seed: null
           kernel_regularizer: null
           kernel_size: !!python/tuple
@@ -131,7 +179,7 @@ config:
           trainable: true
           use_bias: true
         inbound_nodes:
-        - - - spatial_dropout2d_1
+        - - - max_pooling2d_1
             - 0
             - 0
             - {}
@@ -139,12 +187,13 @@ config:
       - class_name: MaxPooling2D
         config:
           data_format: channels_last
+          dtype: float32
           name: max_pooling2d_2
           padding: same
-          pool_size: &id005 !!python/tuple
+          pool_size: &id006 !!python/tuple
           - 2
           - 2
-          strides: *id005
+          strides: *id006
           trainable: true
         inbound_nodes:
         - - - conv2d_2
@@ -163,14 +212,12 @@ config:
           bias_regularizer: null
           data_format: channels_last
           dilation_rate: *id003
-          filters: 16
+          dtype: float32
+          filters: 32
           kernel_constraint: null
           kernel_initializer:
-            class_name: VarianceScaling
+            class_name: GlorotUniform
             config:
-              distribution: uniform
-              mode: fan_avg
-              scale: 1.0
               seed: null
           kernel_regularizer: null
           kernel_size: !!python/tuple
@@ -190,58 +237,8 @@ config:
       - class_name: MaxPooling2D
         config:
           data_format: channels_last
+          dtype: float32
           name: max_pooling2d_3
-          padding: same
-          pool_size: &id006 !!python/tuple
-          - 2
-          - 2
-          strides: *id006
-          trainable: true
-        inbound_nodes:
-        - - - conv2d_3
-            - 0
-            - 0
-            - {}
-        name: max_pooling2d_3
-      - class_name: Conv2D
-        config:
-          activation: relu
-          activity_regularizer: null
-          bias_constraint: null
-          bias_initializer:
-            class_name: Zeros
-            config: {}
-          bias_regularizer: null
-          data_format: channels_last
-          dilation_rate: *id003
-          filters: 32
-          kernel_constraint: null
-          kernel_initializer:
-            class_name: VarianceScaling
-            config:
-              distribution: uniform
-              mode: fan_avg
-              scale: 1.0
-              seed: null
-          kernel_regularizer: null
-          kernel_size: !!python/tuple
-          - 3
-          - 3
-          name: conv2d_4
-          padding: same
-          strides: *id004
-          trainable: true
-          use_bias: true
-        inbound_nodes:
-        - - - max_pooling2d_3
-            - 0
-            - 0
-            - {}
-        name: conv2d_4
-      - class_name: MaxPooling2D
-        config:
-          data_format: channels_last
-          name: max_pooling2d_4
           padding: same
           pool_size: &id007 !!python/tuple
           - 2
@@ -249,11 +246,11 @@ config:
           strides: *id007
           trainable: true
         inbound_nodes:
-        - - - conv2d_4
+        - - - conv2d_3
             - 0
             - 0
             - {}
-        name: max_pooling2d_4
+        name: max_pooling2d_3
       - class_name: LocallyConnected2D
         config:
           activation: linear
@@ -264,20 +261,19 @@ config:
             config: {}
           bias_regularizer: null
           data_format: channels_last
+          dtype: float32
           filters: 32
+          implementation: 1
           kernel_constraint: null
           kernel_initializer:
-            class_name: VarianceScaling
+            class_name: GlorotUniform
             config:
-              distribution: uniform
-              mode: fan_avg
-              scale: 1.0
               seed: null
           kernel_regularizer: null
           kernel_size: !!python/tuple
           - 3
           - 3
-          name: locally_connected2d_1
+          name: locally_connected2d
           padding: valid
           strides: &id010 !!python/tuple
           - 1
@@ -285,15 +281,16 @@ config:
           trainable: true
           use_bias: true
         inbound_nodes:
-        - - - max_pooling2d_4
+        - - - max_pooling2d_3
             - 0
             - 0
             - {}
-        name: locally_connected2d_1
+        name: locally_connected2d
       - class_name: ZeroPadding2D
         config:
           data_format: channels_last
-          name: zero_padding2d_1
+          dtype: float32
+          name: zero_padding2d
           padding: !!python/tuple
           - !!python/tuple
             - 1
@@ -303,15 +300,16 @@ config:
             - 1
           trainable: true
         inbound_nodes:
-        - - - locally_connected2d_1
+        - - - locally_connected2d
             - 0
             - 0
             - {}
-        name: zero_padding2d_1
+        name: zero_padding2d
       - class_name: MaxPooling2D
         config:
           data_format: channels_last
-          name: max_pooling2d_5
+          dtype: float32
+          name: max_pooling2d_4
           padding: same
           pool_size: &id008 !!python/tuple
           - 2
@@ -319,34 +317,36 @@ config:
           strides: *id008
           trainable: true
         inbound_nodes:
-        - - - zero_padding2d_1
+        - - - zero_padding2d
             - 0
             - 0
             - {}
-        name: max_pooling2d_5
+        name: max_pooling2d_4
       - class_name: ActivityRegularization
         config:
+          dtype: float32
           l1: 0.0
           l2: 0.0
-          name: activity_regularization_1
+          name: activity_regularization
           trainable: true
         inbound_nodes:
-        - - - max_pooling2d_5
+        - - - max_pooling2d_4
             - 0
             - 0
             - {}
-        name: activity_regularization_1
+        name: activity_regularization
       - class_name: Flatten
         config:
           data_format: channels_last
-          name: flatten_1
+          dtype: float32
+          name: flatten
           trainable: true
         inbound_nodes:
-        - - - activity_regularization_1
+        - - - activity_regularization
             - 0
             - 0
             - {}
-        name: flatten_1
+        name: flatten
       - class_name: Dense
         config:
           activation: relu
@@ -356,25 +356,23 @@ config:
             class_name: Zeros
             config: {}
           bias_regularizer: null
+          dtype: float32
           kernel_constraint: null
           kernel_initializer:
-            class_name: VarianceScaling
+            class_name: GlorotUniform
             config:
-              distribution: uniform
-              mode: fan_avg
-              scale: 1.0
               seed: null
           kernel_regularizer: null
-          name: dense_1
+          name: dense
           trainable: true
           units: 32
           use_bias: true
         inbound_nodes:
-        - - - flatten_1
+        - - - flatten
             - 0
             - 0
             - {}
-        name: dense_1
+        name: dense
       - class_name: Dense
         config:
           activation: linear
@@ -384,13 +382,11 @@ config:
             class_name: Zeros
             config: {}
           bias_regularizer: null
+          dtype: float32
           kernel_constraint: null
           kernel_initializer:
-            class_name: VarianceScaling
+            class_name: GlorotUniform
             config:
-              distribution: uniform
-              mode: fan_avg
-              scale: 1.0
               seed: null
           kernel_regularizer: null
           name: z_mean
@@ -398,7 +394,7 @@ config:
           units: 8
           use_bias: true
         inbound_nodes:
-        - - - dense_1
+        - - - dense
             - 0
             - 0
             - {}
@@ -412,13 +408,11 @@ config:
             class_name: Zeros
             config: {}
           bias_regularizer: null
+          dtype: float32
           kernel_constraint: null
           kernel_initializer:
-            class_name: VarianceScaling
+            class_name: GlorotUniform
             config:
-              distribution: uniform
-              mode: fan_avg
-              scale: 1.0
               seed: null
           kernel_regularizer: null
           name: z_log_var
@@ -426,16 +420,18 @@ config:
           units: 8
           use_bias: true
         inbound_nodes:
-        - - - dense_1
+        - - - dense
             - 0
             - 0
             - {}
         name: z_log_var
       - class_name: Lambda
         config:
-          arguments: {}
+          arguments: !!python/object/apply:builtins.dict
+          - {}
+          dtype: float32
           function: !!python/tuple
-          - '4wEAAAAAAAAABgAAAAQAAABDAAAAc0oAAAB8AFwCfQF9AnQAagF8AYMBZAEZAH0DdABqAnwBgwFk
+          - '4wEAAAAAAAAABgAAAAQAAABDAAAAc0oAAAB8AC8CfQF9AnQAagF8AYMBZAEZAH0DdABqAnwBgwFk
 
             AhkAfQR0AGoDfAN8BGYCZAONAX0FfAF0AGoEZAR8AhQAgwF8BRQAFwBTACkF+spSZXBhcmFtZXRl
 
@@ -449,19 +445,21 @@ config:
 
             AADaCWludF9zaGFwZdoNcmFuZG9tX25vcm1hbNoDZXhwKQbaBGFyZ3PaBnpfbWVhbtoJel9sb2df
 
-            dmFy2gViYXRjaNoDZGlt2gdlcHNpbG9uqQByDwAAAPo2RTpcZGV2XGxpdHRsZWNhcm1hc2hcbGl0
+            dmFy2gViYXRjaNoDZGlt2gdlcHNpbG9uqQByDwAAAPo7RTovZGV2X3dvcmsvbGl0dGxlY2FybWFz
 
-            dGxlY2FybWFzaFxtb2RlbF92YWVfM3N0YWdlLnB52ghzYW1wbGluZy0AAABzCgAAAAAHCAEOAQ4C
+            aC9saXR0bGVjYXJtYXNoL21vZGVsX3ZhZV8zc3RhZ2UucHnaCHNhbXBsaW5nLQAAAHMKAAAAAAcI
 
-            EAE=
+            AQ4BDgIQAQ==
 
             '
           - null
           - null
           function_type: lambda
+          module: model_vae_3stage
           name: z
           output_shape: !!python/tuple
           - 8
+          output_shape_module: null
           output_shape_type: raw
           trainable: true
         inbound_nodes:
@@ -517,16 +515,14 @@ config:
             class_name: Zeros
             config: {}
           bias_regularizer: null
+          dtype: float32
           kernel_constraint: null
           kernel_initializer:
-            class_name: VarianceScaling
+            class_name: GlorotUniform
             config:
-              distribution: uniform
-              mode: fan_avg
-              scale: 1.0
               seed: null
           kernel_regularizer: null
-          name: dense_2
+          name: dense_1
           trainable: true
           units: 2048
           use_bias: true
@@ -535,21 +531,22 @@ config:
             - 0
             - 0
             - {}
-        name: dense_2
+        name: dense_1
       - class_name: Reshape
         config:
-          name: reshape_1
+          dtype: float32
+          name: reshape
           target_shape: !!python/tuple
           - 8
           - 8
           - 32
           trainable: true
         inbound_nodes:
-        - - - dense_2
+        - - - dense_1
             - 0
             - 0
             - {}
-        name: reshape_1
+        name: reshape
       - class_name: LocallyConnected2D
         config:
           activation: linear
@@ -560,34 +557,34 @@ config:
             config: {}
           bias_regularizer: null
           data_format: channels_last
+          dtype: float32
           filters: 32
+          implementation: 1
           kernel_constraint: null
           kernel_initializer:
-            class_name: VarianceScaling
+            class_name: GlorotUniform
             config:
-              distribution: uniform
-              mode: fan_avg
-              scale: 1.0
               seed: null
           kernel_regularizer: null
           kernel_size: !!python/tuple
           - 3
           - 3
-          name: locally_connected2d_2
+          name: locally_connected2d_1
           padding: valid
           strides: *id010
           trainable: true
           use_bias: true
         inbound_nodes:
-        - - - reshape_1
+        - - - reshape
             - 0
             - 0
             - {}
-        name: locally_connected2d_2
+        name: locally_connected2d_1
       - class_name: ZeroPadding2D
         config:
           data_format: channels_last
-          name: zero_padding2d_2
+          dtype: float32
+          name: zero_padding2d_1
           padding: !!python/tuple
           - !!python/tuple
             - 1
@@ -597,14 +594,64 @@ config:
             - 1
           trainable: true
         inbound_nodes:
-        - - - locally_connected2d_2
+        - - - locally_connected2d_1
             - 0
             - 0
             - {}
-        name: zero_padding2d_2
+        name: zero_padding2d_1
       - class_name: UpSampling2D
         config:
           data_format: channels_last
+          dtype: float32
+          interpolation: nearest
+          name: up_sampling2d
+          size: !!python/tuple
+          - 2
+          - 2
+          trainable: true
+        inbound_nodes:
+        - - - zero_padding2d_1
+            - 0
+            - 0
+            - {}
+        name: up_sampling2d
+      - class_name: Conv2D
+        config:
+          activation: relu
+          activity_regularizer: null
+          bias_constraint: null
+          bias_initializer:
+            class_name: Zeros
+            config: {}
+          bias_regularizer: null
+          data_format: channels_last
+          dilation_rate: *id003
+          dtype: float32
+          filters: 32
+          kernel_constraint: null
+          kernel_initializer:
+            class_name: GlorotUniform
+            config:
+              seed: null
+          kernel_regularizer: null
+          kernel_size: !!python/tuple
+          - 3
+          - 3
+          name: conv2d_4
+          padding: same
+          strides: *id004
+          trainable: true
+          use_bias: true
+        inbound_nodes:
+        - - - up_sampling2d
+            - 0
+            - 0
+            - {}
+        name: conv2d_4
+      - class_name: UpSampling2D
+        config:
+          data_format: channels_last
+          dtype: float32
           interpolation: nearest
           name: up_sampling2d_1
           size: !!python/tuple
@@ -612,7 +659,7 @@ config:
           - 2
           trainable: true
         inbound_nodes:
-        - - - zero_padding2d_2
+        - - - conv2d_4
             - 0
             - 0
             - {}
@@ -628,14 +675,12 @@ config:
           bias_regularizer: null
           data_format: channels_last
           dilation_rate: *id003
-          filters: 32
+          dtype: float32
+          filters: 16
           kernel_constraint: null
           kernel_initializer:
-            class_name: VarianceScaling
+            class_name: GlorotUniform
             config:
-              distribution: uniform
-              mode: fan_avg
-              scale: 1.0
               seed: null
           kernel_regularizer: null
           kernel_size: !!python/tuple
@@ -655,6 +700,7 @@ config:
       - class_name: UpSampling2D
         config:
           data_format: channels_last
+          dtype: float32
           interpolation: nearest
           name: up_sampling2d_2
           size: !!python/tuple
@@ -678,14 +724,12 @@ config:
           bias_regularizer: null
           data_format: channels_last
           dilation_rate: *id003
+          dtype: float32
           filters: 16
           kernel_constraint: null
           kernel_initializer:
-            class_name: VarianceScaling
+            class_name: GlorotUniform
             config:
-              distribution: uniform
-              mode: fan_avg
-              scale: 1.0
               seed: null
           kernel_regularizer: null
           kernel_size: !!python/tuple
@@ -705,6 +749,7 @@ config:
       - class_name: UpSampling2D
         config:
           data_format: channels_last
+          dtype: float32
           interpolation: nearest
           name: up_sampling2d_3
           size: !!python/tuple
@@ -728,14 +773,12 @@ config:
           bias_regularizer: null
           data_format: channels_last
           dilation_rate: *id003
-          filters: 16
+          dtype: float32
+          filters: 8
           kernel_constraint: null
           kernel_initializer:
-            class_name: VarianceScaling
+            class_name: GlorotUniform
             config:
-              distribution: uniform
-              mode: fan_avg
-              scale: 1.0
               seed: null
           kernel_regularizer: null
           kernel_size: !!python/tuple
@@ -755,6 +798,7 @@ config:
       - class_name: UpSampling2D
         config:
           data_format: channels_last
+          dtype: float32
           interpolation: nearest
           name: up_sampling2d_4
           size: !!python/tuple
@@ -778,14 +822,12 @@ config:
           bias_regularizer: null
           data_format: channels_last
           dilation_rate: *id003
-          filters: 8
+          dtype: float32
+          filters: 1
           kernel_constraint: null
           kernel_initializer:
-            class_name: VarianceScaling
+            class_name: GlorotUniform
             config:
-              distribution: uniform
-              mode: fan_avg
-              scale: 1.0
               seed: null
           kernel_regularizer: null
           kernel_size: !!python/tuple
@@ -802,59 +844,9 @@ config:
             - 0
             - {}
         name: conv2d_8
-      - class_name: UpSampling2D
-        config:
-          data_format: channels_last
-          interpolation: nearest
-          name: up_sampling2d_5
-          size: !!python/tuple
-          - 2
-          - 2
-          trainable: true
-        inbound_nodes:
-        - - - conv2d_8
-            - 0
-            - 0
-            - {}
-        name: up_sampling2d_5
-      - class_name: Conv2D
-        config:
-          activation: relu
-          activity_regularizer: null
-          bias_constraint: null
-          bias_initializer:
-            class_name: Zeros
-            config: {}
-          bias_regularizer: null
-          data_format: channels_last
-          dilation_rate: *id003
-          filters: 1
-          kernel_constraint: null
-          kernel_initializer:
-            class_name: VarianceScaling
-            config:
-              distribution: uniform
-              mode: fan_avg
-              scale: 1.0
-              seed: null
-          kernel_regularizer: null
-          kernel_size: !!python/tuple
-          - 3
-          - 3
-          name: conv2d_9
-          padding: same
-          strides: *id004
-          trainable: true
-          use_bias: true
-        inbound_nodes:
-        - - - up_sampling2d_5
-            - 0
-            - 0
-            - {}
-        name: conv2d_9
       name: vae_decoder
       output_layers:
-      - - conv2d_9
+      - - conv2d_8
         - 0
         - 0
     inbound_nodes:
@@ -868,4 +860,4 @@ config:
   - - vae_decoder
     - 1
     - 0
-keras_version: 2.2.4
+keras_version: 2.2.4-tf

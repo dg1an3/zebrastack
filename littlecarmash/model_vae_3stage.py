@@ -4,18 +4,18 @@ encapsulates VAE model in a class
 
 import random
 
-from keras.activations import relu, sigmoid
-from keras.layers import Dense, Input, SpatialDropout2D
-from keras.layers import Conv2D, Flatten, Lambda
-from keras.layers import LocallyConnected2D, ZeroPadding2D
-from keras.layers import MaxPooling2D, UpSampling2D
-from keras.layers import Reshape, Conv2DTranspose
-from keras.layers import ActivityRegularization, Activation
+from tensorflow.keras.activations import relu, sigmoid
+from tensorflow.keras.layers import Dense, Input, SpatialDropout2D
+from tensorflow.keras.layers import Conv2D, Flatten, Lambda
+from tensorflow.keras.layers import LocallyConnected2D, ZeroPadding2D
+from tensorflow.keras.layers import MaxPooling2D, UpSampling2D
+from tensorflow.keras.layers import Reshape, Conv2DTranspose
+from tensorflow.keras.layers import ActivityRegularization, Activation
 
-from keras.models import Model
-from keras.losses import mse, binary_crossentropy
-from keras.utils import plot_model
-from keras import backend as K
+from tensorflow.keras.models import Model
+from tensorflow.keras.losses import mse, binary_crossentropy
+from tensorflow.keras.utils import plot_model
+from tensorflow.keras import backend as K
 
 def build_encoded_layer(size, in_channels=1, l1_l2=(0.0e-4, 0.0e-4), use_dropout=True):
     """Create encoded layer, prior to projection to latent space."""
