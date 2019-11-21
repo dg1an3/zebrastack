@@ -1,5 +1,5 @@
-from keras import backend as K
-from keras.engine.topology import Layer
+from tensorflow.keras import backend as K
+from tensorflow.keras.layers import Layer
 
 if K.backend() == 'tensorflow':
     import tensorflow as tf
@@ -34,13 +34,15 @@ class BilinearInterpolation(Layer):
 
     def compute_output_shape(self, input_shapes):
         height, width = self.output_size
-        num_channels = input_shapes[0][-1]
+        num_channels = input_shapes[-1]
         return (None, height, width, num_channels)
 
     def call(self, tensors, mask=None):
         X, transformation = tensors
+        # input_shape = tf.shape(X)
         output = self._transform(X, transformation, self.output_size)
         return output
+        # return tf.reshape(output, self.compute_output_shape(input_shape))
 
     def _interpolate(self, image, sampled_grids, output_size):
 
@@ -129,7 +131,7 @@ class BilinearInterpolation(Layer):
         transformations = K.reshape(affine_transformation,
                                     shape=(batch_size, 2, 3))
         # transformations = K.cast(affine_transformation[:, 0:2, :], 'float32')
-        regular_grids = self._make_regular_grids(batch_size, *output_size)
+        regular_grids = self._make_regular_grids(batch_size, output_size[0], output_size[1])
         sampled_grids = K.batch_dot(transformations, regular_grids)
         interpolated_image = self._interpolate(X, sampled_grids, output_size)
         new_shape = (batch_size, output_size[0], output_size[1], num_channels)

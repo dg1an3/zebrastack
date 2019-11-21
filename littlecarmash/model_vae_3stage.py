@@ -17,10 +17,25 @@ from tensorflow.keras.losses import mse, binary_crossentropy
 from tensorflow.keras.utils import plot_model
 from tensorflow.keras import backend as K
 
-def build_encoded_layer(size, in_channels=1, l1_l2=(0.0e-4, 0.0e-4), use_dropout=True):
-    """Create encoded layer, prior to projection to latent space."""
-    input_img = Input(shape=(size, size, in_channels), name='input_img')
+from utils import get_initial_weights
+from layers import BilinearInterpolation
 
+def pre_STN(input_shape=(60, 60, 1), sampling_size=(30, 30)):
+    input_image = Input(shape=input_shape, name='input_img')
+    locnet = MaxPooling2D(pool_size=(2, 2))(input_image)
+    locnet = Conv2D(20, (5, 5))(locnet)
+    locnet = MaxPooling2D(pool_size=(2, 2))(locnet)
+    locnet = Conv2D(20, (5, 5))(locnet)
+    locnet = Flatten()(locnet)
+    locnet = Dense(50)(locnet)
+    locnet = Activation('relu')(locnet)
+    weights = get_initial_weights(50)
+    locnet = Dense(6, weights=weights)(locnet)
+    x = BilinearInterpolation(sampling_size)([input_image, locnet])
+    return x, input_image
+
+def build_encoded_layer(input_img, l1_l2=(0.0e-4, 0.0e-4), use_dropout=True):
+    """Create encoded layer, prior to projection to latent space."""
     x = Conv2D(8, (3, 3), activation=relu, padding='same')(input_img)
     x = MaxPooling2D((2, 2), padding='same')(x)
 
@@ -40,7 +55,7 @@ def build_encoded_layer(size, in_channels=1, l1_l2=(0.0e-4, 0.0e-4), use_dropout
     x = MaxPooling2D((2, 2), padding='same')(x)
     l1, l2 = l1_l2
     encoded_layer = ActivityRegularization(l1=l1, l2=l2)(x)
-    return encoded_layer, input_img
+    return encoded_layer
 
 def sampling(args):
     """Reparameterization trick by sampling fr an isotropic unit Gaussian.
@@ -126,9 +141,11 @@ class ModelVae3Stage:
     def __init__(self, size=64, in_channels=1, latent_dim=8, use_kldiv=True):
         self.size = size
 
+        xformed_img, input_img = pre_STN(input_shape=(size,size,in_channels), sampling_size=(size//2,size//2))
+        # xformed_img = Reshape((size,size,in_channels))(xformed_img)
+
         # TODO: try to read stored model, if available
-        encoded_layer, input_img = \
-            build_encoded_layer(size, in_channels=in_channels)
+        encoded_layer = build_encoded_layer(xformed_img)
         self.encoder, self.z_mean, self.z_log_var = \
             build_latent_encoder(encoded_layer, input_img, latent_dim=latent_dim)
         
@@ -139,7 +156,7 @@ class ModelVae3Stage:
 
         bind_loss = lambda y_true, y_pred: self.vae_loss(y_true, y_pred)
         self.vae = \
-            build_autoencoder(self.encoder, self.decoder, input_img,  loss=bind_loss, optimizer='adadelta')
+            build_autoencoder(self.encoder, self.decoder, xformed_img,  loss=bind_loss, optimizer='adadelta')
 
     def __str__(self):
         # output as yaml
