@@ -51,7 +51,7 @@ def build_autoencoder(sz, optimizer, loss):
     shape = K.int_shape(encoded_layer)
 
     # generate latent vector Q(z|X)
-    latent_dim = 16
+    latent_dim = 8
     x = Flatten()(encoded_layer)
     x = Dense(32, activation='relu')(x)
     z_mean = Dense(latent_dim, name='z_mean')(x)

@@ -80,7 +80,8 @@ def gen_imageset_array(dataset_name, sz, frac=1.0):
             print('loading dataset: ', dataset_fullpath)
             nparr = np.load(dataset_fullpath)
             mid_slice = int(nparr.shape[0]/2)
-            nparr = nparr[mid_slice-10:mid_slice+10]
+            # nparr = nparr[mid_slice-10:mid_slice+10]
+            nparr = nparr[mid_slice:mid_slice+1]
             yield nparr
 
 def read_imageset_arrays(dataset_name, sz, frac=1.0):
