@@ -1,8 +1,10 @@
 import matplotlib.pyplot as plt
+import scipy.ndimage
 
 def show_grayscale(rows, columns, at, pixel_array, sz):
     ax = plt.subplot(rows, columns, at)
-    plt.imshow(pixel_array.reshape(sz, sz))
+    interp_array = scipy.ndimage.zoom(pixel_array.reshape(sz,sz), 4.0, order=5)
+    plt.imshow(interp_array.reshape(sz*4, sz*4))
     plt.gray()
     ax.get_xaxis().set_visible(False)
     ax.get_yaxis().set_visible(False)
