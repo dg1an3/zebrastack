@@ -260,7 +260,7 @@ paket-files/
 # Python Tools for Visual Studio (PTVS)
 __pycache__/
 *.pyc
-/keras_autoencoder/data/*
 /.ionide
-/keras_autoencoder/.ipynb_checkpoints
-/keras_autoencoder/models
+/*/.ipynb_checkpoints
+/*/models
+/*/data/*
