@@ -6,15 +6,11 @@ from skimage.io import imsave
 
 app = Flask(__name__)
 
-@app.route('/hello')
-def hello():
-    return render_template('hello.html')
-
-@app.route('/slider')
+@app.route('/')
 def slider():
     return render_template('slider.html')
 
-@app.route('/sliderValue')
+@app.route('/histogram')
 def sliderValue():
     values = request.args['newValue']
     text = '|'.join([('*' * (int(n) // 10)) for n in values.split(',')])
@@ -41,10 +37,7 @@ def imageUpdate():
     imsave(bytesIO, arr, plugin='pil', format_str='png')
     bytesIO.seek(0)
     return send_file(bytesIO, mimetype='image/png')
-
-    # filename = 'test.png'
-    # return send_file(filename, mimetype='image/png')    
-
+    
 @app.route('/jsx/<path:path>')
 def send_jsx(path):
     return send_from_directory('jsx', path)
