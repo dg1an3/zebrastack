@@ -5,8 +5,7 @@
     <ProjectGuid>0eb231cf-807e-4ca4-9a32-f1c42d98ea54</ProjectGuid>
     <ProjectHome>
     </ProjectHome>
-    <StartupFile>
-    </StartupFile>
+    <StartupFile>train_model.py</StartupFile>
     <SearchPath>
     </SearchPath>
     <WorkingDirectory>.</WorkingDirectory>
@@ -28,6 +27,7 @@
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="processed_image.py" />
+    <Compile Include="train_model.py" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
   <!-- Uncomment the CoreCompile target to enable the Build command in
