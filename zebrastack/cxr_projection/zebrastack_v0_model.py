@@ -1,4 +1,3 @@
-from pathlib import Path
 from keras.layers import Dense, Input, SpatialDropout2D
 from keras.layers import Conv2D, Flatten, Lambda
 from keras.layers import LocallyConnected2D, ZeroPadding2D
@@ -57,19 +56,9 @@ def vae_loss(z_mean, z_log_var, y_true, y_pred):
     return K.mean(match_loss + kl_loss)
 
 def create_encoder():
-    """ creates the encoder side of the autoencoder, for the parameters sz and latent_dim
-    # Static parameters
-        sz (int): sz x sz input
-        latent_dim (int): gaussian dimensions
-        locally_connected_channels = 2
-    # Arguments
-        <none>
-    # Returns
-        retina: the input layer
-        encoder: the encoder model
-        shape: shape of last input layer
-        [z_mean, z_log_var, z]: tensors for latent space
     """
+    """
+    # create encoder side
     retina = Input(shape=(sz,sz,1), name='retina_{}'.format(sz))
 
     v1_conv2d = Conv2D(16, (5,5), name='v1_conv2d', activation=act_func, padding='same')(retina)
@@ -122,16 +111,8 @@ def create_encoder():
     return retina, encoder, shape, [z_mean, z_log_var, z]
 
 def create_decoder(shape):
-    """ creates the decoder side of the autoencoder, given the input shape
-    # Static parameters
-        sz (int): sz x sz input
-        latent_dim (int): gaussian dimensions
-        locally_connected_channels = 2
-    # Arguments
-        shape: first input layer shape
-    # Returns
-        decoder: the decoder model
-    """    
+    """
+    """
     latent_inputs = Input(shape=(latent_dim,), name='z_sampling')
     pulvinar_dense_back = Dense(shape[1] * shape[2] * shape[3], name='pulvinar_dense_back', 
                                 activation=act_func)(latent_inputs)
@@ -173,18 +154,9 @@ def create_decoder(shape):
         
     return decoder
 
-def create_autoencoder():
-    """ create the full autoencoder
-    # Arguments
-        <none>
-    # Returns
-        encoder: the encoder model
-        decoder: the decoder model
-        autoencoder: full model
-    """    
-    retina, encoder, shape, prob_model = create_encoder()
-    decoder = create_decoder(shape)
-    
+def create_autoencoder(retina, encoder, prob_model, decoder):
+    """
+    """
     autoencoder_output = decoder(encoder(retina)[2])
     autoencoder = Model(retina, autoencoder_output, name='v1_to_pulvinar_vae')
 
@@ -197,22 +169,4 @@ def create_autoencoder():
     if do_plot_model: 
         plot_model(autoencoder, to_file='data\{}.png'.format(autoencoder.name), show_shapes=True)
         
-    return encoder, decoder, autoencoder
-
-def create_autoencoder_load_weights(basename:Path):
-    """ creates and loads weights 
-    """
-    encoder, decoder, autoencoder = create_autoencoder()
-    encoder.load_weights(basename)
-    decoder.load_weights(basename)
-    autoencoder.load_weights(basename)
-    return encoder, decoder, autoencoder
-    
-def autoencoder_save_weights(basename:Path, encoder, decoder, autoencoder):
-    """ saves weights
-    """
-    encoder.save_weights(basename)
-    decoder.save_weights(basename)
-    autoencoder.save_weights(basename)
-    return True
-        
+    return autoencoder
