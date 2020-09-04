@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 from scipy import ndimage
 from IPython.display import clear_output
-from image_ops import img2grayscale, resize_img
+from .image_ops import img2grayscale, resize_img
 
 def show_thumbnail(rows, columns, at, pixel_array, sz=128):
     """ shows a single thumbnail at a given positioin in the subplot """

@@ -4,7 +4,7 @@ import numpy as np
 from typing import Callable, List
 from imageio import imread
 from pydicom import dcmread
-from show_thumbnails import show_inline_notebook
+from .show_thumbnails import show_inline_notebook
 
 # set up the data_all and data_temp variables
 data_all, data_temp = Path(os.environ['DATA_ALL']), Path(os.environ['DATA_TEMP'])
