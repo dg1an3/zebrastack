@@ -20,12 +20,14 @@ def temp_from_original(original_path:Path, temp_label):
 
 def preprocess_images(filepaths:List[str], reader:Callable, 
                       processor:Callable, temp_path:Path, 
+                      select_img:Callable=None,
                       show_in_notebook=True):
     """ performs preprocessing on a list of filepaths
     storing in numpy files in the temp path
     """
     if show_in_notebook:
         original_imgs, processed_imgs = [], []
+        
     for filepath in filepaths:
         relative_path, original_img = reader(filepath)        
         processed_path = temp_path / relative_path
@@ -44,6 +46,10 @@ def preprocess_images(filepaths:List[str], reader:Callable,
             original_imgs.append(original_img)        
             processed_imgs.append(processed_img)
         
+        if select_img and not select_img(processed_img):
+            print(f"Rejecting image at path {str(processed_path)}", end='\r')
+            continue
+            
         # save processed to the temp path
         np.save(processed_path, processed_img)
         

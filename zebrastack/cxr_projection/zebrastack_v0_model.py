@@ -14,7 +14,7 @@ locally_connected_channels = 2
 do_plot_model = False
 cit_decimate = False
 act_func = 'softplus' # or 'relu'
-use_mse = True # False
+use_mse = False
 
 def sampling(args):
     """
@@ -47,13 +47,15 @@ def vae_loss(z_mean, z_log_var, y_true, y_pred):
     """
     from tensorflow.keras.losses import mse, binary_crossentropy
     from keras import backend as K
-    img_pixels = sz * sz
+    img_pixels = 1.0 # sz * sz * 100.0
     if use_mse:
         match_loss = mse(K.flatten(y_true), K.flatten(y_pred)) * img_pixels
     else:
-        match_loss = binary_crossentropy(K.flatten(y_true), K.flatten(y_pred)) * img_pixels
+        match_loss = img_pixels * \
+            binary_crossentropy(K.flatten(y_true), K.flatten(y_pred))
+            # binary_crossentropy(K.flatten(y_true), K.flatten(y_pred))
     kl_loss = - 0.5 * K.sum(1 + z_log_var - K.square(z_mean) - K.exp(z_log_var), axis=-1)
-    return K.mean(match_loss + kl_loss)
+    return match_loss + (1e-6 * kl_loss)
 
 def create_encoder():
     """
@@ -61,17 +63,17 @@ def create_encoder():
     # create encoder side
     retina = Input(shape=(sz,sz,1), name='retina_{}'.format(sz))
 
-    v1_conv2d = Conv2D(16, (5,5), name='v1_conv2d', activation=act_func, padding='same')(retina)
+    v1_conv2d = Conv2D(32, (5,5), name='v1_conv2d', activation=act_func, padding='same')(retina)
     v1_maxpool = MaxPooling2D((2,2), name='v1_maxpool', padding='same')(v1_conv2d)
     v1_dropout = SpatialDropout2D(0.1, name='v1_dropout')(v1_maxpool)
 
-    v2_conv2d = Conv2D(16, (3,3), name='v2_conv2d', activation=act_func, padding='same')(v1_dropout)
+    v2_conv2d = Conv2D(64, (1,1), name='v2_conv2d', activation=act_func, padding='same')(v1_dropout)
     v2_maxpool = MaxPooling2D((2,2), name='v2_maxpool', padding='same')(v2_conv2d)
 
-    v4_conv2d = Conv2D(32, (3,3), name='v4_conv2d', activation=act_func, padding='same')(v2_maxpool)
+    v4_conv2d = Conv2D(64, (3,3), name='v4_conv2d', activation=act_func, padding='same')(v2_maxpool)
     v4_maxpool = MaxPooling2D((2,2), name='v4_maxpool', padding='same')(v4_conv2d)
 
-    pit_conv2d = Conv2D(32, (3,3), name='pit_conv2d', activation=act_func, padding='same')(v4_maxpool)
+    pit_conv2d = Conv2D(64, (1,1), name='pit_conv2d', activation=act_func, padding='same')(v4_maxpool)
     pit_maxpool = MaxPooling2D((2,2), name='pit_maxpool', padding='same')(pit_conv2d)
 
     cit_conv2d = Conv2D(64, (3,3), name='cit_conv2d', activation=act_func, padding='same')(pit_maxpool)
@@ -133,19 +135,19 @@ def create_decoder(shape):
                                        activation=act_func, padding='same')(ait_out_back)
     cit_upsample_back = UpSampling2D((2,2), name='cit_upsample_back')(cit_conv2d_trans)
 
-    pit_conv2d_trans = Conv2DTranspose(32, (3,3), name='pit_conv2d_trans', 
+    pit_conv2d_trans = Conv2DTranspose(64, (1,1), name='pit_conv2d_trans', 
                                        activation=act_func, padding='same')(cit_upsample_back)
     pit_upsample_back = UpSampling2D((2,2), name='pit_upsample_back')(pit_conv2d_trans)
 
-    v4_conv2d_trans = Conv2DTranspose(32, (3,3), name='v4_conv2d_trans', 
+    v4_conv2d_trans = Conv2DTranspose(64, (3,3), name='v4_conv2d_trans', 
                                       activation=act_func, padding='same')(pit_upsample_back)
     v4_upsample_back = UpSampling2D((2,2), name='v4_upsample_back')(v4_conv2d_trans)
 
-    v2_conv2d_trans = Conv2DTranspose(16, (3,3), name='v2_conv2d_trans', 
+    v2_conv2d_trans = Conv2DTranspose(32, (1,1), name='v2_conv2d_trans', 
                                       activation=act_func, padding='same')(v4_upsample_back)
     v2_upsample_back = UpSampling2D((2,2), name='v2_upsample_back')(v2_conv2d_trans)
 
-    v1_conv2d_5x5_back = Conv2D(1, (5,5), name='v1_conv2d_5x5_back', 
+    v1_conv2d_5x5_back = Conv2DTranspose(1, (5,5), name='v1_conv2d_5x5_back', 
                                 activation='sigmoid', padding='same')(v2_upsample_back)
     decoder = Model(latent_inputs, v1_conv2d_5x5_back, name='pulvinar_to_v1_decoder')
     decoder.summary()
