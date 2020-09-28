@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import tensorflow as tf
 from skimage.color import rgb2gray
 from skimage.transform import resize
 from skimage.util import img_as_uint
@@ -44,3 +45,13 @@ def center_surround(original_img, sz=128):
     img = clahe_img(img)
     img = whiten_img(img)
     return img
+
+def channelized_center_surround(original_img, filter_bank, sz=128):
+    """ center-surround processing channelized by a filter bank """
+    img = center_surround(original_img)
+    img = np.reshape(img, (1,sz,sz,1))    
+    img_tf = tf.constant(img, tf.float32)
+    img_out = tf.nn.conv2d(img_tf, filter_bank,
+                           strides=[1, 1, 1, 1],
+                           padding='SAME')
+    return img_out

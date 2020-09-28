@@ -54,11 +54,12 @@ def preprocess_images(filepaths:List[str], reader:Callable,
         np.save(processed_path, processed_img)
         
         # output a message, and show callback if it is time
-        print(f"{processed_path} {original_img.shape} {original_img.dtype}", end='\r')
-        if (len(processed_imgs) == 100):
-            if show_in_notebook:
-                show_inline_notebook(original_imgs[-11:-1], processed_imgs[-11:-1])
-            original_imgs, processed_imgs = [], []
+        print(f"{processed_path} {original_img.shape} {original_img.dtype} {processed_img.shape}       ",
+              end='\r')
+        # if (len(processed_imgs) == 100):
+        #     if show_in_notebook:
+        #         show_inline_notebook(original_imgs[-11:-1], processed_imgs[-11:-1])
+        #         original_imgs, processed_imgs = [], []
                        
 def read_imageio(filepath:str):
     """ helper to read a standard img (jpg, png, etc) 

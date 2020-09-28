@@ -61,7 +61,7 @@ def create_encoder():
     """
     """
     # create encoder side
-    retina = Input(shape=(sz,sz,1), name='retina_{}'.format(sz))
+    retina = Input(shape=(sz,sz,4), name='retina_{}'.format(sz))
 
     v1_conv2d = Conv2D(32, (5,5), name='v1_conv2d', activation=act_func, padding='same')(retina)
     v1_maxpool = MaxPooling2D((2,2), name='v1_maxpool', padding='same')(v1_conv2d)
@@ -147,7 +147,7 @@ def create_decoder(shape):
                                       activation=act_func, padding='same')(v4_upsample_back)
     v2_upsample_back = UpSampling2D((2,2), name='v2_upsample_back')(v2_conv2d_trans)
 
-    v1_conv2d_5x5_back = Conv2DTranspose(1, (5,5), name='v1_conv2d_5x5_back', 
+    v1_conv2d_5x5_back = Conv2DTranspose(4, (5,5), name='v1_conv2d_5x5_back', 
                                 activation='sigmoid', padding='same')(v2_upsample_back)
     decoder = Model(latent_inputs, v1_conv2d_5x5_back, name='pulvinar_to_v1_decoder')
     decoder.summary()
