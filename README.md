@@ -27,3 +27,7 @@ anat0mixer\zebrastack_v0_covidnet.ipynb:    "    decoder = keras.models.load_mod
 littlecarmash\model_vae_3stage.py:from tensorflow.keras.models import Model
 littlecarmash\LittleCarVae-cardb.ipynb:    "from keras.models import Model\n",
 littlecarmash\LittleCarVae.ipynb:    "from keras.models import Model\n",     
+
+
+Example streamlit app: 
+https://docs.streamlit.io/en/stable/tutorial/create_a_data_explorer_app.html

@@ -2,20 +2,16 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>0eb231cf-807e-4ca4-9a32-f1c42d98ea54</ProjectGuid>
-    <ProjectHome>
-    </ProjectHome>
-    <StartupFile>train_model.py</StartupFile>
+    <ProjectGuid>0beeeadb-8b14-46d3-afd9-0815afa48934</ProjectGuid>
+    <ProjectHome>.</ProjectHome>
+    <StartupFile>py_unittest.py</StartupFile>
     <SearchPath>
     </SearchPath>
     <WorkingDirectory>.</WorkingDirectory>
     <OutputPath>.</OutputPath>
-    <Name>littlecarmash</Name>
-    <RootNamespace>LittleCarVae</RootNamespace>
-    <TestFramework>unittest</TestFramework>
-    <UnitTestPattern>test*.py</UnitTestPattern>
-    <UnitTestRootDirectory>
-    </UnitTestRootDirectory>
+    <Name>py_unittest</Name>
+    <RootNamespace>py_unittest</RootNamespace>
+    <InterpreterId>MSBuild|env|$(MSBuildProjectFullPath)</InterpreterId>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
     <DebugSymbols>true</DebugSymbols>
@@ -26,15 +22,18 @@
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="littlecarmash.py" />
-    <Compile Include="model_vae_3stage.py">
-      <SubType>Code</SubType>
-    </Compile>
-    <Compile Include="processed_image.py" />
-    <Compile Include="test_model_vae_3stage.py">
-      <SubType>Code</SubType>
-    </Compile>
-    <Compile Include="train_model.py" />
+    <Compile Include="py_unittest.py" />
+  </ItemGroup>
+  <ItemGroup>
+    <Interpreter Include="env\">
+      <Id>env</Id>
+      <Version>3.7</Version>
+      <Description>env (Python 3.7 (64-bit))</Description>
+      <InterpreterPath>Scripts\python.exe</InterpreterPath>
+      <WindowsInterpreterPath>Scripts\pythonw.exe</WindowsInterpreterPath>
+      <PathEnvironmentVariable>PYTHONPATH</PathEnvironmentVariable>
+      <Architecture>X64</Architecture>
+    </Interpreter>
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
   <!-- Uncomment the CoreCompile target to enable the Build command in

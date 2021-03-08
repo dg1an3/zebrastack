@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 15
-VisualStudioVersion = 15.0.28307.136
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.30611.23
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "LeastSquares.UnitTest", "LeastSquares.UnitTest\LeastSquares.UnitTest.fsproj", "{9AB0C9DC-ABB9-4EE8-B360-43BF60FEF050}"
 EndProject
@@ -15,6 +15,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		.gitignore = .gitignore
 		README.md = README.md
 	EndProjectSection
+EndProject
+Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "py_unittest", "py_unittest\py_unittest.pyproj", "{0BEEEADB-8B14-46D3-AFD9-0815AFA48934}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -32,6 +34,8 @@ Global
 		{16CF630E-5558-4DEA-A306-032456EF9DBE}.Release|Any CPU.Build.0 = Release|Any CPU
 		{FF1019EB-84A1-4CD0-97D4-C19068728C63}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{FF1019EB-84A1-4CD0-97D4-C19068728C63}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0BEEEADB-8B14-46D3-AFD9-0815AFA48934}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0BEEEADB-8B14-46D3-AFD9-0815AFA48934}.Release|Any CPU.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

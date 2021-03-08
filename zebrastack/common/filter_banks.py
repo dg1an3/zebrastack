@@ -76,7 +76,7 @@ def show_filter_bank(filter_bank:tf.Tensor, rows=1):
     assert rows * per_row == filter_count
     
     logging.info(f"Showing {filter_count} filters in {per_row} rows")
-    fig, axs = plt.subplots(rows,per_row,figsize=(5,2*rows))
+    fig, axs = plt.subplots(rows,per_row,figsize=(10,2*rows))
     for n in range(filter_count):
         filter = tf.reshape(filter_bank[...,0,n], filter_bank.shape[:2])
         if rows > 1:
@@ -91,7 +91,7 @@ def show_filter_response(filter_response:tf.Tensor, rows=1):
     assert rows * per_row == filter_count
     
     logging.info(f"Showing {filter_count} filters in {per_row} rows")
-    fig, axs = plt.subplots(rows,per_row,figsize=(5,2*rows))
+    fig, axs = plt.subplots(rows,per_row,figsize=(10,2*rows))
     for n in range(filter_count):
         logging.info(f"filter_response.shape = {filter_response.shape})")
         filter = tf.reshape(filter_response[...,n], 

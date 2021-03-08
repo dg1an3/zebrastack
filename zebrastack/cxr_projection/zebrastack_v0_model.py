@@ -1,12 +1,12 @@
-from keras.layers import Dense, Input, SpatialDropout2D
-from keras.layers import Conv2D, Flatten, Lambda
-from keras.layers import LocallyConnected2D, ZeroPadding2D
-from keras.layers import MaxPooling2D, UpSampling2D
-from keras.layers import Reshape, Conv2DTranspose
-from keras.layers import ActivityRegularization
-from keras.models import Model
-from keras.utils import plot_model
-from keras import backend as K
+from tensorflow.keras.layers import Dense, Input, SpatialDropout2D
+from tensorflow.keras.layers import Conv2D, Flatten, Lambda
+from tensorflow.keras.layers import LocallyConnected2D, ZeroPadding2D
+from tensorflow.keras.layers import MaxPooling2D, UpSampling2D
+from tensorflow.keras.layers import Reshape, Conv2DTranspose
+from tensorflow.keras.layers import ActivityRegularization
+from tensorflow.keras.models import Model
+from tensorflow.keras.utils import plot_model
+from tensorflow.keras import backend as K
 
 sz = 128
 latent_dim = 12
@@ -28,7 +28,7 @@ def sampling(args):
     """    
     z_mean, z_log_var = args
     
-    from keras import backend as K
+    # from keras import backend as K
     batch = K.shape(z_mean)[0]
     dim = K.int_shape(z_mean)[1]
     # by default, random_normal has mean=0 and std=1.0
@@ -46,7 +46,7 @@ def vae_loss(z_mean, z_log_var, y_true, y_pred):
         loss value
     """
     from tensorflow.keras.losses import mse, binary_crossentropy
-    from keras import backend as K
+    # from keras import backend as K
     img_pixels = 1.0 # sz * sz * 100.0
     if use_mse:
         match_loss = mse(K.flatten(y_true), K.flatten(y_pred)) * img_pixels
@@ -61,7 +61,7 @@ def create_encoder():
     """
     """
     # create encoder side
-    retina = Input(shape=(sz,sz,4), name='retina_{}'.format(sz))
+    retina = Input(shape=(sz,sz,1), name='retina_{}'.format(sz))
 
     v1_conv2d = Conv2D(32, (5,5), name='v1_conv2d', activation=act_func, padding='same')(retina)
     v1_maxpool = MaxPooling2D((2,2), name='v1_maxpool', padding='same')(v1_conv2d)
@@ -147,7 +147,7 @@ def create_decoder(shape):
                                       activation=act_func, padding='same')(v4_upsample_back)
     v2_upsample_back = UpSampling2D((2,2), name='v2_upsample_back')(v2_conv2d_trans)
 
-    v1_conv2d_5x5_back = Conv2DTranspose(4, (5,5), name='v1_conv2d_5x5_back', 
+    v1_conv2d_5x5_back = Conv2DTranspose(1, (5,5), name='v1_conv2d_5x5_back', 
                                 activation='sigmoid', padding='same')(v2_upsample_back)
     decoder = Model(latent_inputs, v1_conv2d_5x5_back, name='pulvinar_to_v1_decoder')
     decoder.summary()
