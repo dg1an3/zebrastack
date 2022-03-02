@@ -70,34 +70,34 @@ def conv2d_sq(img:tf.Tensor, filters:tf.Tensor):
                 + tf.nn.conv2d(img, tf.math.imag(filters), strides=1, padding='SAME') ** 2
     return tf.nn.conv2d(img, filters, strides=1, padding='SAME') ** 2
 
-def show_filter_bank(filter_bank:tf.Tensor, rows=1):
+def show_filter_bank(filter_bank:tf.Tensor, rows=1, log_out=False):
     filter_count = filter_bank.shape[-1]
     per_row = filter_count // rows
     assert rows * per_row == filter_count
     
-    logging.info(f"Showing {filter_count} filters in {per_row} rows")
+    if log_out: logging.info(f"Showing {filter_count} filters in {per_row} rows")
     fig, axs = plt.subplots(rows,per_row,figsize=(10,2*rows))
     for n in range(filter_count):
         filter = tf.reshape(filter_bank[...,0,n], filter_bank.shape[:2])
         if rows > 1:
-            logging.info(f"{n}:{n // per_row} {n % per_row}")
+            if log_out: logging.info(f"{n}:{n // per_row} {n % per_row}")
             axs[n // per_row][n % per_row].imshow(tf.math.real(filter), cmap='plasma')
         else:
             axs[n].imshow(filter, cmap='plasma')
 
-def show_filter_response(filter_response:tf.Tensor, rows=1):
+def show_filter_response(filter_response:tf.Tensor, rows=1, log_out=False):
     filter_count = filter_response.shape[-1]
     per_row = filter_count // rows
     assert rows * per_row == filter_count
     
-    logging.info(f"Showing {filter_count} filters in {per_row} rows")
+    if log_out: logging.info(f"Showing {filter_count} filters in {per_row} rows")
     fig, axs = plt.subplots(rows,per_row,figsize=(10,2*rows))
     for n in range(filter_count):
-        logging.info(f"filter_response.shape = {filter_response.shape})")
+        if log_out: logging.info(f"filter_response.shape = {filter_response.shape})")
         filter = tf.reshape(filter_response[...,n], 
                             (filter_response.shape[1], filter_response.shape[2]))
         if rows > 1:
-            logging.info(f"{n}:{n // per_row} {n % per_row}")
+            if log_out: logging.info(f"{n}:{n // per_row} {n % per_row}")
             axs[n // per_row][n % per_row].imshow(filter, cmap='plasma')
         else:
             axs[n].imshow(filter, cmap='plasma')            

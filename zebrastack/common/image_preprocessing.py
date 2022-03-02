@@ -8,7 +8,7 @@ from .show_thumbnails import show_inline_notebook
 
 # set up the data_all and data_temp variables
 data_all, data_temp = Path(os.environ['DATA_ALL']), Path(os.environ['DATA_TEMP'])
-print(f"image_processing: DATA_ALL={data_all}; DATA_TEMP={data_temp}")
+# print(f"image_processing: DATA_ALL={data_all}; DATA_TEMP={data_temp}")
 
 def temp_from_original(original_path:Path, temp_label):
     """

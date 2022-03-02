@@ -9,12 +9,12 @@ from tensorflow.keras.utils import plot_model
 from tensorflow.keras import backend as K
 
 sz = 128
-latent_dim = 12
+latent_dim = 8
 locally_connected_channels = 2
 do_plot_model = False
 cit_decimate = False
 act_func = 'softplus' # or 'relu'
-use_mse = False
+use_mse = True
 
 def sampling(args):
     """
@@ -55,7 +55,7 @@ def vae_loss(z_mean, z_log_var, y_true, y_pred):
             binary_crossentropy(K.flatten(y_true), K.flatten(y_pred))
             # binary_crossentropy(K.flatten(y_true), K.flatten(y_pred))
     kl_loss = - 0.5 * K.sum(1 + z_log_var - K.square(z_mean) - K.exp(z_log_var), axis=-1)
-    return match_loss + (1e-6 * kl_loss)
+    return match_loss + (1e-2 * kl_loss)
 
 def create_encoder():
     """
