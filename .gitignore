@@ -5,3 +5,6 @@ data/
 __pycache__/
 weights/
 runs/
+.vs/
+obj/
+bin/
