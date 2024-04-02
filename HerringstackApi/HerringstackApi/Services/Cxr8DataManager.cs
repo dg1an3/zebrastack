@@ -5,25 +5,27 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Net.Http;
 using System.Threading.Tasks;
 using CsvHelper;
 using HerringstackApi.Abstractions;
 using Microsoft.Extensions.Configuration;
-using static System.Net.WebRequestMethods;
+using FluentResults;
+using TorchSharp;
 
 /// <summary>
 /// 
 /// </summary>
 public class Cxr8DataManager : ICxr8DataManager
 {
-    private readonly Uri _baseUri;
+    private readonly string _basePath;
     private readonly string _csvMetadataPath;
     private readonly string _csvBoundingBoxPath;
 
     private readonly string _imagePath;
     private readonly string _clahePath;
     private readonly string _reconPath;
+
+    private readonly torch.nn.Module _model;
 
     private IList<CsvImageMetadata> _metadataItems;
     private IList<CsvBoundingBoxMetadata> _boundingBoxItems;
@@ -34,13 +36,16 @@ public class Cxr8DataManager : ICxr8DataManager
     /// <param name="configuration"></param>
     public Cxr8DataManager(IConfiguration configuration)
     {
-        _baseUri = new Uri("https://localhost:7000/api/LatentCxrImage/DataBaseRoot/");
+        _basePath = configuration["DataBasePath"];
 
         _csvMetadataPath = configuration["MetadataCsvName"];
         _csvBoundingBoxPath = configuration["BoundingBoxCsvName"];
         _imagePath = configuration["ImageSubpath"];
         _clahePath = configuration["ClaheSubpath"];
         _reconPath = configuration["ReconSubpath"];
+
+        var modelPath = configuration["ModelPath"];
+        var state_dict = torch.load(modelPath);
     }
 
     /// <summary>
@@ -50,15 +55,18 @@ public class Cxr8DataManager : ICxr8DataManager
     public async Task<IList<Subject>> GetSubjectItemsAsync(int pageSize, int pageNumber)
     {
         var metadataItems = await GetMetadataItemsAsync();
-        var patientGroups =
+        IEnumerable<IGrouping<int, CsvImageMetadata>> patientGroups =
             metadataItems.GroupBy(imd => imd.PatientID)
-                // .Where(grp => grp.Count() > 2)
                 .OrderBy(grp => grp.Key);
 
-        var patientGroupsPage = patientGroups.Skip(pageSize * (pageNumber - 1)).Take(pageSize);
+        if (pageSize > 0)
+        {
+            patientGroups = patientGroups.Skip(pageSize * (pageNumber - 1)).Take(pageSize);
+        }
+        
         // TODO: use AutoMapper for this
         var subjectMetadatas =
-            patientGroupsPage.Select(grp =>
+            patientGroups.Select(grp =>
                 new Subject()
                 {
                     SubjectID = grp.Key,
@@ -105,7 +113,7 @@ public class Cxr8DataManager : ICxr8DataManager
     public async Task<IList<BoundingBox>> GetBoundingBoxesForImageAsync(int subjectId, string imageKey)
     {
         var boundingBoxItems = await GetBoundingBoxItemsAsync();
-        var boundingBoxesForImage = boundingBoxItems.Where(bbi => bbi.Id == imageKey);
+        var boundingBoxesForImage = boundingBoxItems.Where(bbi => bbi.Id.CompareTo($"{imageKey}.png") == 0);
 
         // TODO: use AutoMapper to convert
         var converted =
@@ -114,8 +122,8 @@ public class Cxr8DataManager : ICxr8DataManager
                 ImageKey = bbi.Id.Split(".").First(),
                 SubjectID = subjectId,
                 FindingLabel = bbi.FindingLabel,
-                UpperLeft = new decimal[] { bbi.BoundingBoxX, bbi.BoundingBoxY },
-                Extent = new decimal[] { bbi.BoundingBoxWidth, bbi.BoundingBoxHeight },
+                UpperLeft = [bbi.BoundingBoxX, bbi.BoundingBoxY],
+                Extent = [bbi.BoundingBoxWidth, bbi.BoundingBoxHeight],
             });
 
         return converted.ToList();
@@ -142,21 +150,34 @@ public class Cxr8DataManager : ICxr8DataManager
     /// <param name="format"></param>
     /// <returns></returns>
     /// <exception cref="ArgumentException"></exception>
-    public async Task<byte[]> GetImagePixelsAsync(int subjectid, string imagekey, string processed = "none", string format = "png")
+    public async Task<Result<byte[]>> GetImagePixelsAsync(int subjectid, string imagekey, string processed = "none", string format = "png")
     {
-        using (var client = new HttpClient() { BaseAddress = _baseUri })
+        processed = processed.ToLower();
+        var path = $"{_basePath}/{_imagePath}/{imagekey}.{format}";
+        if (!System.IO.File.Exists(path))
         {
-            processed = processed.ToLower();
-            var pixelBytes =
-                processed switch
-                {
-                    "clahe" => await client.GetByteArrayAsync($"{_clahePath}/{imagekey}.{format}"),
-                    "recon" => await client.GetByteArrayAsync($"{_reconPath}/{imagekey}.{format}"),
-                    "none" => await client.GetByteArrayAsync($"{_imagePath}/{imagekey}.{format}"),
-                    _ => throw new ArgumentException("Invalid string value for processed", nameof(processed))
-                };
-            return pixelBytes;
+            return Result.Fail("Not found");
         }
+
+        byte[] pixelBytes = await File.ReadAllBytesAsync(path);
+        if (processed == "recon")
+        {
+            var unprocessPixels = await GetImagePixelsAsync(subjectid, imagekey, processed = "none", format = "png");
+            if (unprocessPixels.IsFailed)
+            {
+                return unprocessPixels;
+            }
+
+            // TODO: load and call model
+
+            pixelBytes = unprocessPixels.Value;
+        }
+        else if (processed != "none")
+        {
+            return Result.Fail($"Invalid string value for processed = {processed}");
+        }
+
+        return Result.Ok(pixelBytes);
     }
 
     async Task<IList<CsvImageMetadata>> GetMetadataItemsAsync()
@@ -181,7 +202,7 @@ public class Cxr8DataManager : ICxr8DataManager
 
     async Task<IList<T>> GetCsvItemsAsync<T>(string path)
     {
-        using var reader = new StreamReader("C:\\data\\cxr8\\Data_Entry_2017_v2020.csv");
+        using var reader = new StreamReader($"{_basePath}\\{path}");
         using var csv = new CsvReader(reader, CultureInfo.InvariantCulture);
         return csv.GetRecords<T>().ToList();
     }

@@ -10,7 +10,7 @@ internal class CsvBoundingBoxMetadata
     [Name("Finding Label")]
     public string FindingLabel { get; set; }
 
-    [Name("Bbox[x")]
+    [Name("Bbox [x")]
     public decimal BoundingBoxX { get; set; }
 
     [Name("y")]

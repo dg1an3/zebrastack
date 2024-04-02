@@ -1,5 +1,6 @@
 ﻿namespace HerringstackApi.Services;
 
+using FluentResults;
 using HerringstackApi.Abstractions;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -46,5 +47,5 @@ public interface ICxr8DataManager
     /// <param name="processed"></param>
     /// <param name="format"></param>
     /// <returns></returns>
-    Task<byte[]> GetImagePixelsAsync(int subjectid, string imagekey, string processed = "none", string format = "png");
+    Task<Result<byte[]>> GetImagePixelsAsync(int subjectid, string imagekey, string processed = "none", string format = "png");
 }
