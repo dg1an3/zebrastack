@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using CsvHelper;
 using HerringstackApi.Abstractions;
 using Microsoft.Extensions.Configuration;
+using static System.Net.WebRequestMethods;
 
 /// <summary>
 /// 
@@ -46,16 +47,18 @@ public class Cxr8DataManager : ICxr8DataManager
     /// 
     /// </summary>
     /// <returns></returns>
-    public async Task<IList<Subject>> GetSubjectItemsAsync()
+    public async Task<IList<Subject>> GetSubjectItemsAsync(int pageSize, int pageNumber)
     {
         var metadataItems = await GetMetadataItemsAsync();
         var patientGroups =
             metadataItems.GroupBy(imd => imd.PatientID)
-                .Where(grp => grp.Count() > 2);
+                // .Where(grp => grp.Count() > 2)
+                .OrderBy(grp => grp.Key);
 
+        var patientGroupsPage = patientGroups.Skip(pageSize * (pageNumber - 1)).Take(pageSize);
         // TODO: use AutoMapper for this
         var subjectMetadatas =
-            patientGroups.Select(grp =>
+            patientGroupsPage.Select(grp =>
                 new Subject()
                 {
                     SubjectID = grp.Key,
@@ -163,7 +166,7 @@ public class Cxr8DataManager : ICxr8DataManager
             _metadataItems = await GetCsvItemsAsync<CsvImageMetadata>(_csvMetadataPath);
         }
 
-        return _metadataItems.Take(1000).ToList();
+        return _metadataItems;
     }
 
     async Task<IList<CsvBoundingBoxMetadata>> GetBoundingBoxItemsAsync()
@@ -173,18 +176,14 @@ public class Cxr8DataManager : ICxr8DataManager
             _boundingBoxItems = await GetCsvItemsAsync<CsvBoundingBoxMetadata>(_csvBoundingBoxPath);
         }
 
-        return _boundingBoxItems.Take(100).ToList();
+        return _boundingBoxItems.ToList();
     }
 
     async Task<IList<T>> GetCsvItemsAsync<T>(string path)
     {
-        using (var reader = new StreamReader("C:\\data\\cxr8\\Data_Entry_2017_v2020.csv"))
-        {
-            using (var csv = new CsvReader(reader, CultureInfo.InvariantCulture))
-            {
-                return csv.GetRecords<T>().ToList();
-            }
-        }
+        using var reader = new StreamReader("C:\\data\\cxr8\\Data_Entry_2017_v2020.csv");
+        using var csv = new CsvReader(reader, CultureInfo.InvariantCulture);
+        return csv.GetRecords<T>().ToList();
     }
 
     Tuple<int, int> GetSubjectAgeRange(IEnumerable<CsvImageMetadata> forMetadatas)

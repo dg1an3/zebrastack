@@ -17,19 +17,20 @@ public class LatentCxrImageController : ControllerBase
         _dataManager = dataManager;
     }
 
-    // GET: api/<LatentCxrImageController>
-    [HttpGet]
-    public async Task<IEnumerable<Subject>> Get()
+    // GET: api/<LatentCxrImageController>/subjects
+    [HttpGet("subjects")]
+    public async Task<IActionResult> Get([FromQuery] SubjectFilter subjectFilter)
     {
-        var subjectItems = await _dataManager.GetSubjectItemsAsync();
-        return subjectItems;
+        var subjectItems = await _dataManager.GetSubjectItemsAsync(subjectFilter.PageSize, subjectFilter.PageNumber);
+        return Ok(subjectItems);
     }
 
-    // GET api/<LatentCxrImageController>/5
-    [HttpGet("{id}")]
-    public string Get(int id)
+    // GET api/<LatentCxrImageController>/subjects/5/images
+    [HttpGet("subjects/{id}/images")]
+    public async Task<IActionResult> GetSubjectImages(int id)
     {
-        return "value";
+        var images = await _dataManager.GetImagesForSubjectAsync(id);
+        return Ok(images);
     }
 
     // POST api/<LatentCxrImageController>

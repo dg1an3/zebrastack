@@ -13,7 +13,7 @@ public interface ICxr8DataManager
     /// 
     /// </summary>
     /// <returns></returns>
-    Task<IList<Subject>> GetSubjectItemsAsync();
+    Task<IList<Subject>> GetSubjectItemsAsync(int pageSize = 0, int pageNumber = 1);
 
     /// <summary>
     /// 
