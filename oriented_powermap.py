@@ -87,8 +87,8 @@ class OrientedPowerMap(nn.Module):
             kernel_size=1,
         )
         # TODO: better initialization?
-        torch.nn.init.normal_(conv_pre.weight, 0.0, 1e-1)
-        torch.nn.init.normal_(conv_pre.bias, 0.0, 1e-1)
+        # torch.nn.init.normal_(conv_pre.weight, 0.0, 1e-1)
+        # torch.nn.init.normal_(conv_pre.bias, 0.0, 1e-1)
 
         conv_1 = nn.Conv2d(
             in_channels,
@@ -113,8 +113,8 @@ class OrientedPowerMap(nn.Module):
         )
 
         # TODO: better initialization?
-        torch.nn.init.normal_(self.conv_2.weight, 0.0, 1e-1)
-        torch.nn.init.normal_(self.conv_2.bias, 0.0, 1e-1)
+        # torch.nn.init.normal_(self.conv_2.weight, 0.0, 1e-1)
+        # torch.nn.init.normal_(self.conv_2.bias, 0.0, 1e-1)
 
         match out_res:
             case None:
@@ -146,8 +146,8 @@ class OrientedPowerMap(nn.Module):
             change_res,
         )
         # TODO: better initialization?
-        torch.nn.init.normal_(self.shortcut[0].weight, 0.0, 1e-1)
-        torch.nn.init.normal_(self.shortcut[0].bias, 0.0, 1e-1)
+        # torch.nn.init.normal_(self.shortcut[0].weight, 0.0, 1e-1)
+        # torch.nn.init.normal_(self.shortcut[0].bias, 0.0, 1e-1)
 
         self.in_planes = kernel_count // 2
         self.out_channels = self.conv_2.out_channels

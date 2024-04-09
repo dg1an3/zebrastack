@@ -29,7 +29,7 @@ from decoder import Decoder
 
 
 def clamp_01(
-    x: Union[dict, torch.Tensor, None], eps: float = 1e-6
+    x: Union[dict, torch.Tensor, None], eps: float = 1e-7
 ) -> Union[dict, torch.Tensor, None]:
     """_summary_
 
@@ -109,9 +109,12 @@ def vae_loss(
     x_v4_back = clamp_01(x_v4_back)
     recon_loss = 0.0
     for loss_func, weight in recon_loss_metrics:
-        if weight < 1e-6: continue
+        if weight < 1e-6:
+            continue
         # for value, value_back in [(x, x_back)]:
-        recon_loss += loss_func(x, x_back, reduction="mean") * weight
+        recon_loss += (
+            loss_func(x[:, 0:4, ...], x_back[:, 0:4, ...], reduction="mean") * weight
+        )
 
         if x_v1 is not None:
             recon_loss += (
@@ -318,12 +321,16 @@ class VAE(nn.Module):
         print(f"theta[0] = {theta_0[0]} {theta_0[1]}")
 
         # and apply
-        grid = F.affine_grid(theta, x.size())
-        x = F.grid_sample(x, grid, padding_mode="reflection")  # padding_mode="zeros")
+        grid_size = x.shape[0], 4, x.shape[2], x.shape[3]
+        grid = F.affine_grid(theta, grid_size)
+        x_moved = F.grid_sample(
+            x[:, 0:4, ...], grid, padding_mode="reflection"
+        )  # padding_mode="zeros")
+        x_final = torch.cat((x_moved, x[:, 4:, ...]), dim=1)
 
         # TODO: move STN resampling to dataset (with metadata csv)
 
-        return x
+        return x_final
 
     def forward_dict(self, x):
         """perform forward pass, returning a dictionary of useful results for loss functions
@@ -344,16 +351,16 @@ class VAE(nn.Module):
 
         # clamp a subset of latent dimensions
         # TODO: make this a settable attribute
-        init_dims = 11
-        z = torch.clamp(
-            z,
-            torch.tensor(
-                [-10.0] * init_dims + [0.0] * (self.latent_dim - init_dims)
-            ).to(z.device),
-            torch.tensor([10.0] * init_dims + [0.0] * (self.latent_dim - init_dims)).to(
-                z.device
-            ),
-        )
+        init_dims = self.latent_dim
+        # z = torch.clamp(
+        #     z,
+        #     torch.tensor(
+        #         [-10.0] * init_dims + [0.0] * (self.latent_dim - init_dims)
+        #     ).to(z.device),
+        #     torch.tensor([10.0] * init_dims + [0.0] * (self.latent_dim - init_dims)).to(
+        #         z.device
+        #     ),
+        # )
 
         # and decode back to the original
         result_decoder = self.decoder.forward_dict(z)
@@ -400,7 +407,7 @@ def load_model(
     device,
     kernel_size=11,  # TODO: ensure these are all hooked up
     directions=5,
-    latent_dim=32*32,
+    latent_dim=32 * 32,
     train_stn=False,
 ):
     """_summary_
@@ -428,7 +435,7 @@ def load_model(
     )
     model = model.to(device)
 
-    optimizer = optim.Adam(model.parameters(), lr=5e-4 )
+    optimizer = optim.Adam(model.parameters(), lr=5e-4)
     # optimizer = optim.SGD(model.parameters(), lr=1e-1)
     if len(epoch_files) > 0:
         dct = torch.load(epoch_files[-1], map_location=device)
@@ -476,7 +483,7 @@ def train_vae(device, train_stn=False, l1_weight=0.9):
 
     train_dataset = Cxr8Dataset(
         root_path,
-        sz=768,
+        sz=512,
         transform=transforms.Compose(
             [
                 transforms.ToTensor(),
@@ -487,7 +494,7 @@ def train_vae(device, train_stn=False, l1_weight=0.9):
     input_size = train_dataset[0]["image"].shape
     logging.info(f"input_size = {input_size}")
 
-    train_loader = DataLoader(train_dataset, batch_size=7, shuffle=True)
+    train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
     logging.info(f"train_dataset length = {len(train_dataset)}")
 
     model, optimizer, start_epoch = load_model(
@@ -495,7 +502,7 @@ def train_vae(device, train_stn=False, l1_weight=0.9):
         device,
         kernel_size=9,
         directions=7,
-        latent_dim=16*16,
+        latent_dim=16 * 16,
         train_stn=train_stn,
     )
     logging.info(set([p.device for p in model.parameters()]))
@@ -515,8 +522,8 @@ def train_vae(device, train_stn=False, l1_weight=0.9):
         optimizer.zero_grad()
 
         result_dict = model.forward_dict(x)
-        # result_dict["x_v1"] = None
-        # result_dict["x_v2"] = None
+        #   result_dict["x_v1"] = None
+        result_dict["x_v2"] = None
         result_dict["x_v4"] = None
         # result_dict = clamp_01(result_dict)
 
@@ -525,7 +532,7 @@ def train_vae(device, train_stn=False, l1_weight=0.9):
                 (F.l1_loss, l1_weight),
                 (F.binary_cross_entropy, (1.0 - l1_weight)),
             ),
-            beta=1e-3,
+            beta=1e-4,
             x=x,
             **result_dict,
         )
@@ -533,6 +540,7 @@ def train_vae(device, train_stn=False, l1_weight=0.9):
         loss.backward()
         # print(f"loss = {loss}; {'nan' if loss.isnan() else ''}")
 
+        # torch.nn.utils.clip_grad.clip_grad_norm_(model.parameters(), max_norm=2.0)
         optimizer.step()
 
         # bit of logic to wait before starting to accumulate loss
@@ -649,8 +657,8 @@ if "__main__" == __name__:
     if args.train:
         # train_vae(device, train_stn=True, train_non_stn=True, l1_weight=0.7)
         for _ in range(3):
-            for l1_weight in [0.7, 0.9]: # 0.7, 0.9]:
-                for train_stn in [True, True]:
+            for l1_weight in [0.9, 0.5]:  # 0.7, 0.9]:
+                for train_stn in [False, True]:
                     train_vae(
                         device,
                         train_stn=train_stn,
