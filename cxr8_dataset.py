@@ -57,6 +57,9 @@ class Cxr8Dataset(Dataset):
 
         self.clahe_4 = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=(4, 4))
 
+        self.pos_encode_channels = 0
+        self.B = np.random.normal(loc=0, scale=1.0, size=(self.pos_encode_channels,2))
+
     def read_img_file(self, img_name):
         img_name = self.root_path / "images" / img_name
         img_name = str(img_name)
@@ -75,8 +78,26 @@ class Cxr8Dataset(Dataset):
         image_clahe_8 = self.apply_clahe(self.clahe_8, image)
         image_clahe_4 = self.apply_clahe(self.clahe_4, image)
 
-        image_result = np.stack(
-            [image, image_clahe_4, image_clahe_8, image_clahe_16], axis=-1
+        # TODO: create positional encoding channels
+        coords = np.linspace(0, 1, self.input_size[0], endpoint=False)
+        grid = np.stack(np.meshgrid(coords, coords), axis=-1)
+        scale = 7.0
+        grid_proj = scale*(2.*np.pi*grid) @ self.B.T
+        # grid_sin_cos = np.concatenate([np.sin(x_grid), np.cos(y_grid)], axis=-1)
+        # print(grid_sin_cos.shape)
+        channel_list = [
+                image,
+                image_clahe_4,
+                image_clahe_8,
+                image_clahe_16,
+        ]
+        for n in range(self.pos_encode_channels):
+            channel_list += [
+                np.sin(grid_proj[...,n]),
+                np.cos(grid_proj[...,n]),
+            ]
+        image_result = np.stack(channel_list,
+            axis=-1,
         )
         return image_result.astype(np.float32)
 
