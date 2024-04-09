@@ -97,7 +97,7 @@ def gabor(
     [[0.0]]
     """
     return complex_exp(xs, ys, freq, angle_rad) * gauss(
-        xs, ys, sigma if sigma else 1.5 / freq
+        xs, ys, sigma if sigma else 1.0 / freq # 1.5 / freq
     )
 
 
@@ -124,7 +124,7 @@ def make_gabor_bank(
     for freq in freqs:
         freq_per_kernel.append(freq)
 
-        kernel = gauss(xs, ys, 1.5 / freq)
+        kernel = gauss(xs, ys, 1.0 / freq) # 1.5 / freq)
         kernels_complex.append(kernel)
 
         for n in range(directions):
