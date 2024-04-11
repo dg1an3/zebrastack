@@ -129,7 +129,7 @@ class OrientedPowerMap(nn.Module):
         self.conv = nn.Sequential(
             conv_pre,
             conv_1,
-            # nn.BatchNorm2d(kernel_count),
+            nn.BatchNorm2d(kernel_count),
             nn.ReLU(True),
             change_res,
             self.se,

@@ -163,8 +163,24 @@ class Encoder(nn.Module):
         )
         self.oriented_powermap_2.to(device)
 
-        self.oriented_powermap_3 = self.oriented_powermap_2
-        self.oriented_powermap_4 = self.oriented_powermap_2
+        self.oriented_powermap_3 = OrientedPowerMap(
+            device,
+            self.oriented_powermap_2.out_channels,
+            kernel_size=init_kernel_size,
+            frequencies=None,
+            directions=directions,
+            out_res="/2",
+        )
+        self.oriented_powermap_3.to(device)
+        self.oriented_powermap_4 = OrientedPowerMap(
+            device,
+            self.oriented_powermap_3.out_channels,
+            kernel_size=init_kernel_size,
+            frequencies=None,
+            directions=directions,
+            out_res="/2",
+        )
+        self.oriented_powermap_4.to(device)
 
         # self.freq_per_kernel = self.oriented_powermap.freq_per_kernel
         self.in_planes = self.oriented_powermap_3.out_channels

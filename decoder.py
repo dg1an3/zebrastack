@@ -187,9 +187,27 @@ class Decoder(nn.Module):
         )
         self.conv_transpose_1.to(device)
 
-        self.conv_transpose_2 = self.conv_transpose_1
+        self.conv_transpose_2 = OrientedPowerMap(
+            device,
+            in_channels=dim_to_conv_tranpose,
+            kernel_size=final_kernel_size,
+            frequencies=None,
+            directions=7,
+            out_res="*2",
+            out_channels=dim_to_conv_tranpose,
+        )
+        self.conv_transpose_2.to(device)
 
-        self.conv_transpose_3 = self.conv_transpose_1
+        self.conv_transpose_3 = OrientedPowerMap(
+            device,
+            in_channels=dim_to_conv_tranpose,
+            kernel_size=final_kernel_size,
+            frequencies=None,
+            directions=7,
+            out_res="*2",
+            out_channels=dim_to_conv_tranpose,
+        )
+        self.conv_transpose_3.to(device)
 
         self.conv_transpose_4 = OrientedPowerMap(
             device,

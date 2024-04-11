@@ -435,7 +435,7 @@ def load_model(
     )
     model = model.to(device)
 
-    optimizer = optim.Adam(model.parameters(), lr=5e-4)
+    optimizer = optim.Adamax(model.parameters(), lr=1e-3)
     # optimizer = optim.SGD(model.parameters(), lr=1e-1)
     if len(epoch_files) > 0:
         dct = torch.load(epoch_files[-1], map_location=device)
@@ -494,7 +494,7 @@ def train_vae(device, train_stn=False, l1_weight=0.9):
     input_size = train_dataset[0]["image"].shape
     logging.info(f"input_size = {input_size}")
 
-    train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
+    train_loader = DataLoader(train_dataset, batch_size=14, shuffle=True)
     logging.info(f"train_dataset length = {len(train_dataset)}")
 
     model, optimizer, start_epoch = load_model(
@@ -657,7 +657,7 @@ if "__main__" == __name__:
     if args.train:
         # train_vae(device, train_stn=True, train_non_stn=True, l1_weight=0.7)
         for _ in range(3):
-            for l1_weight in [0.9, 0.5]:  # 0.7, 0.9]:
+            for l1_weight in [0.9, 0.4]:  # 0.7, 0.9]:
                 for train_stn in [False, True]:
                     train_vae(
                         device,
