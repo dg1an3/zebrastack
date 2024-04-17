@@ -183,42 +183,43 @@ class Encoder(nn.Module):
         self.oriented_powermap_4.to(device)
 
         # self.freq_per_kernel = self.oriented_powermap.freq_per_kernel
-        self.in_planes = self.oriented_powermap_3.out_channels
+        self.in_planes = self.oriented_powermap_4.out_channels
     
         self.residual_blocks = nn.Sequential(
+            nn.Identity()
             # 64x64
-            OrientedPowerMap(
-                device,
-                in_channels=self.in_planes,
-                out_channels=64,
-                kernel_size=7,
-                frequencies=None,
-                out_res=None,
-            ),  # BasicBlock(self.in_planes, 64, stride=2),
-            OrientedPowerMap(
-                device,
-                in_channels=64,
-                out_channels=64,
-                kernel_size=7,
-                frequencies=None,
-                out_res=None,
-            ),  # BasicBlock(64, 64),
-            OrientedPowerMap(
-                device,
-                in_channels=64,
-                out_channels=64,
-                kernel_size=7,
-                frequencies=None,
-                out_res=None,
-            ),  # BasicBlock(64, 64),
-            OrientedPowerMap(
-                device,
-                in_channels=64,
-                out_channels=64,
-                kernel_size=7,
-                frequencies=None,
-                out_res="/2",  # TODO: move to final step in each layer ; then to separate operation
-            ),
+# """            OrientedPowerMap(
+#                 device,
+#                 in_channels=self.in_planes,
+#                 out_channels=64,
+#                 kernel_size=7,
+#                 frequencies=None,
+#                 out_res=None,
+#             ),  # BasicBlock(self.in_planes, 64, stride=2),
+#             OrientedPowerMap(
+#                 device,
+#                 in_channels=64,
+#                 out_channels=64,
+#                 kernel_size=7,
+#                 frequencies=None,
+#                 out_res=None,
+#             ),  # BasicBlock(64, 64),
+#             OrientedPowerMap(
+#                 device,
+#                 in_channels=64,
+#                 out_channels=64,
+#                 kernel_size=7,
+#                 frequencies=None,
+#                 out_res=None,
+#             ),  # BasicBlock(64, 64),
+#             OrientedPowerMap(
+#                 device,
+#                 in_channels=64,
+#                 out_channels=64,
+#                 kernel_size=7,
+#                 frequencies=None,
+#                 out_res="/2",  # TODO: move to final step in each layer ; then to separate operation
+#             ),"""
             # 128x128
             # OrientedPowerMap(
             #     device,
@@ -296,6 +297,24 @@ class Encoder(nn.Module):
         )
         self.residual_blocks.to(device)
 
+        self.penpenultimate_conv1 = nn.Conv2d(
+            in_channels=self.in_planes,
+            out_channels=64,
+            kernel_size=1,
+        ).to(device)
+
+        self.penpenultimate_residual = OrientedPowerMap(
+            device,
+            in_channels=64,
+            out_channels=64,
+            kernel_size=7,
+            frequencies=None,
+            out_res=None,
+        ).to(device)
+        self.penpenultimate_decimate = nn.AvgPool2d(kernel_size=3, stride=2, padding=1).to(
+            device
+        )
+
         self.penultimate_conv1 = nn.Conv2d(
             in_channels=64,
             out_channels=128,
@@ -343,6 +362,13 @@ class Encoder(nn.Module):
 
         output = self.residual_blocks(v1_output)
 
+        output = self.penpenultimate_conv1(output)
+        penpenultimate_bypass = torch.clone(output)
+        for _ in range(3):
+            output = self.penpenultimate_residual(output)
+        output = 0.5 * (penpenultimate_bypass + output)            
+        output = self.penpenultimate_decimate(output)
+
         output = self.penultimate_conv1(output)
         penultimate_bypass = torch.clone(output)
         for _ in range(6):
@@ -377,6 +403,11 @@ class Encoder(nn.Module):
         x_v4 = self.oriented_powermap_3(x_v2)
 
         x = self.residual_blocks(x_v4)
+
+        x = self.penpenultimate_conv1(x)
+        for _ in range(3):
+            x = self.penpenultimate_residual(x)
+        x = self.penpenultimate_decimate(x)
 
         # perform last two residual block
         # TODO: move this to OrientedPowerMap

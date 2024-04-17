@@ -181,7 +181,7 @@ def make_oriented_map(
         # populate with standard golden ratio frequencies
         phi = (5**0.5 + 1) / 2  # golden ratio
         #phi = 2.0
-        frequencies = [phi**n for n in range(2, -2, -1)]
+        frequencies = [phi**n for n in range(2, -3, -1)]
 
     # construct the gabor bank (which is a complex-valued tensor)
     freq_per_kernel, kernels_complex = make_gabor_bank(

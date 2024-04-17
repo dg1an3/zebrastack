@@ -66,7 +66,19 @@ class Decoder(nn.Module):
         )
         self.second_conv1 = nn.Conv2d(kernel_size=1, in_channels=128, out_channels=64)
 
+        self.third_upsample = nn.Upsample(scale_factor=2, mode="bilinear")
+        self.third_residual = OrientedPowerMap(
+            device,
+            in_channels=64,
+            out_channels=64,
+            kernel_size=7,
+            frequencies=None,
+            out_res=None,  # TODO: move this to before OPM
+        )
+        self.third_conv1 = nn.Conv2d(kernel_size=1, in_channels=64, out_channels=dim_to_conv_tranpose)  # TODO: how is 40 calculated?
+
         self.residual_blocks = nn.Sequential(
+            nn.Identity()
             # 256x256
             # OrientedPowerMap(
             #     device,
@@ -142,38 +154,38 @@ class Decoder(nn.Module):
             #     out_res=None,
             # ),
             # 64x64
-            OrientedPowerMap(
-                device,
-                in_channels=64,
-                out_channels=64,
-                kernel_size=7,
-                frequencies=None,
-                out_res="*2",
-            ),
-            OrientedPowerMap(
-                device,
-                in_channels=64,
-                out_channels=64,
-                kernel_size=7,
-                frequencies=None,
-                out_res=None,
-            ),
-            OrientedPowerMap(
-                device,
-                in_channels=64,
-                out_channels=64,
-                kernel_size=7,
-                frequencies=None,
-                out_res=None,
-            ),
-            OrientedPowerMap(
-                device,
-                in_channels=64,
-                out_channels=dim_to_conv_tranpose,
-                kernel_size=7,
-                frequencies=None,
-                out_res=None,
-            ),
+# """             OrientedPowerMap(
+#                 device,
+#                 in_channels=64,
+#                 out_channels=64,
+#                 kernel_size=7,
+#                 frequencies=None,
+#                 out_res="*2",
+#             ),
+#             OrientedPowerMap(
+#                 device,
+#                 in_channels=64,
+#                 out_channels=64,
+#                 kernel_size=7,
+#                 frequencies=None,
+#                 out_res=None,
+#             ),
+#             OrientedPowerMap(
+#                 device,
+#                 in_channels=64,
+#                 out_channels=64,
+#                 kernel_size=7,
+#                 frequencies=None,
+#                 out_res=None,
+#             ),
+#             OrientedPowerMap(
+#                 device,
+#                 in_channels=64,
+#                 out_channels=dim_to_conv_tranpose,
+#                 kernel_size=7,
+#                 frequencies=None,
+#                 out_res=None,
+#             ),"""
         )
 
         self.conv_transpose_1 = OrientedPowerMap(
@@ -252,6 +264,13 @@ class Decoder(nn.Module):
             x = self.second_residual(x)
         x = 0.5 * (x + second_bypass)
         x = self.second_conv1(x)
+
+        x = self.third_upsample(x)
+        third_bypass = torch.clone(x)
+        for _ in range(6):
+            x = self.third_residual(x)
+        x = 0.5 * (x + third_bypass)
+        x = self.third_conv1(x)
 
         x_v4_back = self.residual_blocks(x)
 

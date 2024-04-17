@@ -134,7 +134,7 @@ class OrientedPowerMap(nn.Module):
             change_res,
             self.se,
             self.conv_2,
-            nn.ReLU(True),
+            nn.LeakyReLU(True),
         )
 
         self.shortcut = nn.Sequential(

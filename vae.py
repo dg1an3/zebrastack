@@ -21,9 +21,6 @@ from torch.utils.data import DataLoader
 from torchvision.transforms import transforms
 from torchinfo import summary
 
-
-from cxr8_dataset import Cxr8Dataset
-
 from encoder import Encoder
 from decoder import Decoder
 
@@ -271,12 +268,12 @@ class VAE(nn.Module):
 
         eps = 0.0
 
-        shear_factor = 9e-2
+        shear_factor = 0.0  # 1e+0
         shear = shear_factor * fc_xform_out[:, 5]
         shear = shear.view(-1, 1)
         # shear = torch.clamp(shear, -eps, eps)
 
-        scale_factor = 1e-1
+        scale_factor = 0.0  # 1e+1
         scale_x, scale_y = (
             torch.sigmoid(scale_factor * fc_xform_out[:, 3]) + 0.5,
             torch.sigmoid(scale_factor * fc_xform_out[:, 4]) + 0.5,
@@ -287,13 +284,13 @@ class VAE(nn.Module):
         angle = fc_xform_out[:, 2]
         # angle = torch.clamp(angle, -eps, eps)
 
-        angle_factor = 1e-2
+        angle_factor = 1e-1
         sa = torch.sin(angle_factor * angle).view(-1, 1)
         ca = torch.cos(angle_factor * angle).view(-1, 1)
         # print(f"ca = {ca}")
         # print(f"sa = {sa}")
 
-        xlate_factor = 2e-1
+        xlate_factor = 1e0
         x_shift = xlate_factor * fc_xform_out[:, 0]
         x_shift = x_shift.view(-1, 1)
         # x_shift = torch.clamp(x_shift, -eps, eps)
@@ -435,7 +432,7 @@ def load_model(
     )
     model = model.to(device)
 
-    optimizer = optim.Adamax(model.parameters(), lr=1e-3)
+    optimizer = optim.Adam(model.parameters(), lr=1e-3)
     # optimizer = optim.SGD(model.parameters(), lr=1e-1)
     if len(epoch_files) > 0:
         dct = torch.load(epoch_files[-1], map_location=device)
@@ -471,19 +468,20 @@ def load_model(
 ###########################################
 
 
-def train_vae(device, train_stn=False, l1_weight=0.9):
+def train_vae(device, input_size=(512, 512), train_stn=False, l1_weight=0.9):
     """perform training of the vae model
 
     Args:
         device (torch.Device): device to host training
     """
+    from cxr8_dataset import Cxr8Dataset
     # TODO: move dataset preparation to cxr8_dataset.py
     data_temp_path = os.environ["DATA_TEMP"]
     root_path = Path(data_temp_path) / "cxr8"
 
     train_dataset = Cxr8Dataset(
         root_path,
-        sz=512,
+        sz=input_size,
         transform=transforms.Compose(
             [
                 transforms.ToTensor(),
@@ -494,7 +492,7 @@ def train_vae(device, train_stn=False, l1_weight=0.9):
     input_size = train_dataset[0]["image"].shape
     logging.info(f"input_size = {input_size}")
 
-    train_loader = DataLoader(train_dataset, batch_size=14, shuffle=True)
+    train_loader = DataLoader(train_dataset, batch_size=10, shuffle=True)
     logging.info(f"train_dataset length = {len(train_dataset)}")
 
     model, optimizer, start_epoch = load_model(
@@ -502,7 +500,7 @@ def train_vae(device, train_stn=False, l1_weight=0.9):
         device,
         kernel_size=9,
         directions=7,
-        latent_dim=16 * 16,
+        latent_dim=32 * 32,  # 16 * 16,
         train_stn=train_stn,
     )
     logging.info(set([p.device for p in model.parameters()]))
@@ -522,17 +520,17 @@ def train_vae(device, train_stn=False, l1_weight=0.9):
         optimizer.zero_grad()
 
         result_dict = model.forward_dict(x)
-        #   result_dict["x_v1"] = None
-        result_dict["x_v2"] = None
+        # result_dict["x_v1"] = None
+        # result_dict["x_v2"] = None
         result_dict["x_v4"] = None
         # result_dict = clamp_01(result_dict)
 
         recon_loss, kldiv_loss, loss = vae_loss(
             recon_loss_metrics=(
-                (F.l1_loss, l1_weight),
+                (F.mse_loss, l1_weight),
                 (F.binary_cross_entropy, (1.0 - l1_weight)),
             ),
-            beta=1e-4,
+            beta=1e-1,
             x=x,
             **result_dict,
         )
@@ -604,8 +602,13 @@ def infer_vae(device, input_size, source_dir):
     """
     print(f"inferring images in {source_dir}")
 
-    model, _, start_epoch = load_model(
-        input_size, device, kernel_size=7, directions=5, latent_dim=96
+    model, optimizer, start_epoch = load_model(
+        input_size,
+        device,
+        kernel_size=9,
+        directions=7,
+        latent_dim=32 * 32,  # 16 * 16,
+        train_stn=train_stn,
     )
 
     print(
@@ -658,7 +661,7 @@ if "__main__" == __name__:
         # train_vae(device, train_stn=True, train_non_stn=True, l1_weight=0.7)
         for _ in range(3):
             for l1_weight in [0.9, 0.4]:  # 0.7, 0.9]:
-                for train_stn in [False, True]:
+                for train_stn in [True]:
                     train_vae(
                         device,
                         train_stn=train_stn,
