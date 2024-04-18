@@ -2,7 +2,8 @@ import datetime
 import logging
 import os
 from typing import Callable, Tuple
-from matplotlib import colors
+import matplotlib as mpl
+# from matplotlib import colors, colormaps, image
 import torch
 import torch.nn.functional as F
 from torchinfo import summary
@@ -248,7 +249,8 @@ def infer_vae(device, input_size: Tuple[int, int, int], source_dir: str):
         ),
     )
 
-    gamma = colors.PowerNorm(gamma=2.1, vmin=0.0, vmax=1.1)
+    bone_cmap = mpl.colormaps['bone']
+    gamma = mpl.colors.PowerNorm(gamma=2.1, vmin=0.0, vmax=1.1)
 
     for n in range(0, len(infer_dataset)):
         sample = infer_dataset[n]
@@ -266,59 +268,68 @@ def infer_vae(device, input_size: Tuple[int, int, int], source_dir: str):
         for ch in range(recon_image.shape[1]):
             slice_image = recon_image[0, ch, :, :]
 
-            slice_image = (slice_image - np.min(slice_image)) / (
-                np.max(slice_image) - np.min(slice_image)
-            )
-            slice_image = gamma(slice_image)
-            slice_image *= 255.0
-            slice_image = slice_image.astype(np.uint8)
-            slice_image = Image.fromarray(
-                slice_image, "L"
-            )  # 'L' mode for (8-bit grayscale pixels)
+            # slice_image = (slice_image - np.min(slice_image)) / (
+            #     np.max(slice_image) - np.min(slice_image)
+            # )
+            # slice_image = bone_cmap(slice_image, gamma=1.0)
+            # # slice_image = gamma(slice_image)
+            # slice_image *= 255.0
+            # slice_image = slice_image.astype(np.uint8)
+            # slice_image = Image.fromarray(
+            #     slice_image, "RGBA"
+            # )  # 'L' mode for (8-bit grayscale pixels)
 
             # Save the image
             [fn] = sample["filenames"]
             fn = fn.split(".")[0]
-            slice_image.save(f"reconst_cxr8\{fn}_{ch}.png")
-
-
-        ori_image = model(image) # torch.randn(1, 4, 512, 512) + 0.5
-        ori_latent, _ = model.encoder(image)
-        # ori_image = torch.clamp(ori_image, 0, 1)
-        ori_image = ori_image.to(device)
-        ori_image.requires_grad_(True)
-
-        opt = torch.optim.Adam([ori_image], lr=1e-3)
-
-        # Training:
-        for i in range(10000):
-            opt.zero_grad()            
-            latent, _ = model.encoder(ori_image)
-            loss = F.mse_loss(ori_latent, latent)
-            loss.backward()
-            opt.step()
-            if i % 10 == 0:
-                print("Iteration %d, Loss=%f" % (
-                    i, float(loss)))
-
-        ori_image = ori_image.detach()
-        ori_image = ori_image.cpu()
-        ori_image = ori_image.numpy()        
-        for ch in range(ori_image.shape[1]):
-            slice_image = ori_image[0, ch, :, :]
-
-            slice_image = (slice_image - np.min(slice_image)) / (
-                np.max(slice_image) - np.min(slice_image)
+            # slice_image.save(f"reconst_cxr8\{fn}_{ch}.png")
+            mpl.image.imsave(
+                f"reconst_cxr8\{fn}_{ch}.png",
+                np.around(400.0 * slice_image, decimals=0),
+                vmin=0.0,
+                vmax=400.0,
+                cmap="bone",
             )
-            slice_image = gamma(slice_image)
-            slice_image *= 255.0
-            slice_image = slice_image.astype(np.uint8)
-            slice_image = Image.fromarray(
-                slice_image, "L"
-            )  # 'L' mode for (8-bit grayscale pixels)
 
-            # Save the image
-            slice_image.save(f"ori_image_{ch}.png")            
+
+        # ori_image = model(image) # torch.randn(1, 4, 512, 512) + 0.5
+        # ori_latent, _ = model.encoder(image)
+        # # ori_image = torch.clamp(ori_image, 0, 1)
+        # ori_image = ori_image.to(device)
+        # ori_image.requires_grad_(True)
+
+        # opt = torch.optim.Adam([ori_image], lr=1e-3)
+
+        # # Training:
+        # for i in range(10000):
+        #     opt.zero_grad()            
+        #     latent, _ = model.encoder(ori_image)
+        #     loss = F.mse_loss(ori_latent, latent)
+        #     loss.backward()
+        #     opt.step()
+        #     if i % 10 == 0:
+        #         print("Iteration %d, Loss=%f" % (
+        #             i, float(loss)))
+
+        # ori_image = ori_image.detach()
+        # ori_image = ori_image.cpu()
+        # ori_image = ori_image.numpy()        
+        # for ch in range(ori_image.shape[1]):
+        #     slice_image = ori_image[0, ch, :, :]
+
+        #     slice_image = (slice_image - np.min(slice_image)) / (
+        #         np.max(slice_image) - np.min(slice_image)
+        #     )
+        #     slice_image = gamma(slice_image)
+        #     slice_image *= 255.0
+
+        #     slice_image = slice_image.astype(np.uint8)
+        #     slice_image = Image.fromarray(
+        #         slice_image, "L"
+        #     )  # 'L' mode for (8-bit grayscale pixels)
+
+        #     # Save the image
+        #     slice_image.save(f"ori_image_{ch}.png")            
 
 if "__main__" == __name__:
     import argparse
