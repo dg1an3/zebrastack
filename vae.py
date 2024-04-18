@@ -290,7 +290,7 @@ class VAE(nn.Module):
         # print(f"ca = {ca}")
         # print(f"sa = {sa}")
 
-        xlate_factor = 1e0
+        xlate_factor = 1e-1
         x_shift = xlate_factor * fc_xform_out[:, 0]
         x_shift = x_shift.view(-1, 1)
         # x_shift = torch.clamp(x_shift, -eps, eps)
@@ -432,7 +432,7 @@ def load_model(
     )
     model = model.to(device)
 
-    optimizer = optim.Adam(model.parameters(), lr=1e-3)
+    optimizer = optim.Adam(model.parameters(), lr=1e-2)
     # optimizer = optim.SGD(model.parameters(), lr=1e-1)
     if len(epoch_files) > 0:
         dct = torch.load(epoch_files[-1], map_location=device)
@@ -520,8 +520,8 @@ def train_vae(device, input_size=(512, 512), train_stn=False, l1_weight=0.9):
         optimizer.zero_grad()
 
         result_dict = model.forward_dict(x)
-        # result_dict["x_v1"] = None
-        # result_dict["x_v2"] = None
+        result_dict["x_v1"] = None
+        result_dict["x_v2"] = None
         result_dict["x_v4"] = None
         # result_dict = clamp_01(result_dict)
 
