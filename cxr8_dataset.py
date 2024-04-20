@@ -283,15 +283,17 @@ def infer_vae(device, input_size: Tuple[int, int, int], source_dir: str):
             [fn] = sample["filenames"]
             fn = fn.split(".")[0]
             # slice_image.save(f"reconst_cxr8\{fn}_{ch}.png")
+            # TODO: implement gamma
+            # TODO: move to show_utils
             mpl.image.imsave(
                 f"reconst_cxr8\{fn}_{ch}.png",
-                np.around(400.0 * slice_image, decimals=0),
+                np.around(25.0 * slice_image, decimals=0),
                 vmin=0.0,
-                vmax=400.0,
+                vmax=25.0,
                 cmap="bone",
             )
 
-
+        # TODO: implement bokeh shifter front end
         # ori_image = model(image) # torch.randn(1, 4, 512, 512) + 0.5
         # ori_latent, _ = model.encoder(image)
         # # ori_image = torch.clamp(ori_image, 0, 1)
@@ -369,4 +371,4 @@ if "__main__" == __name__:
         )
 
     if args.infer:
-        infer_vae(device, input_size=512, source_dir=args.infer)
+        infer_vae(device, input_size=256, source_dir=args.infer)

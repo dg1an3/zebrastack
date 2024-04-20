@@ -99,7 +99,7 @@ class OrientedPowerMap(nn.Module):
             padding_mode="replicate",
             bias=True,
         )
-        conv_1.weight = torch.nn.Parameter(kernels, requires_grad=False)
+        conv_1.weight = torch.nn.Parameter(kernels, requires_grad=True)
 
         self.se = SqueezeExcitation(
             input_channels=kernel_count,
