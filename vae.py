@@ -109,16 +109,19 @@ def vae_loss(
         if weight < 1e-6:
             continue
         # for value, value_back in [(x, x_back)]:
-        recon_loss += (
-            loss_func(x[:, 0:4, ...], x_back[:, 0:4, ...], reduction="mean") * weight
+        recon_loss += 0.1 * (
+            loss_func(
+                x[:, 0:4, ...],
+                x_back[:, 0:4, ...] # , reduction="mean"
+            ) * weight
         )
 
         if x_v1 is not None:
-            recon_loss += (
-                loss_func(
+            recon_loss += 0.9 * (
+                F.cross_entropy(
                     x_v1,
                     x_v1_back,
-                    reduction="mean",
+                    # reduction="mean",
                 )
                 * weight
             )
@@ -520,14 +523,14 @@ def train_vae(device, input_size=(512, 512), train_stn=False, l1_weight=0.9):
         optimizer.zero_grad()
 
         result_dict = model.forward_dict(x)
-        result_dict["x_v1"] = None
+        # result_dict["x_v1"] = None
         result_dict["x_v2"] = None
         result_dict["x_v4"] = None
         # result_dict = clamp_01(result_dict)
 
         recon_loss, kldiv_loss, loss = vae_loss(
             recon_loss_metrics=(
-                (F.mse_loss, l1_weight),
+                (F.l1_loss, l1_weight),
                 (F.binary_cross_entropy, (1.0 - l1_weight)),
             ),
             beta=1e-1,
