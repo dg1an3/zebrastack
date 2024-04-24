@@ -56,7 +56,7 @@ class OrientedPowerMap(nn.Module):
         if frequencies:
             self.frequencies = frequencies
         else:
-            self.frequencies = [2.0, 1.0, 0.5, 0.25, 0.125]
+            self.frequencies = [1.0, 0.5, 0.25] # [2.0, 1.0, 0.5, 0.25, 0.125]
 
         self.directions = directions
 
@@ -81,6 +81,7 @@ class OrientedPowerMap(nn.Module):
         kernel_count = len(self.freq_per_kernel)
         print(f"len(freq_per_kernel) = {kernel_count}")
 
+        # TODO: rename to conv_1x1_pre
         conv_pre = nn.Conv2d(
             in_channels=in_channels,
             out_channels=in_channels,
@@ -90,6 +91,7 @@ class OrientedPowerMap(nn.Module):
         # torch.nn.init.normal_(conv_pre.weight, 0.0, 1e-1)
         # torch.nn.init.normal_(conv_pre.bias, 0.0, 1e-1)
 
+        # TODO: rename to conv_gabor
         conv_1 = nn.Conv2d(
             in_channels,
             kernel_count,
@@ -106,6 +108,8 @@ class OrientedPowerMap(nn.Module):
             squeeze_channels=kernel_count // 8,
         )
 
+        # TODO: rename to conv_1x1_post
+        # TODO: substitute SE for this
         self.conv_2 = nn.Conv2d(
             in_channels=kernel_count,
             out_channels=kernel_count // 2 if out_channels is None else out_channels,
@@ -211,4 +215,5 @@ class TestOrientedPowerMap(unittest.TestCase):
 
 
 if __name__ == "__main__":
+    # TODO: dump filter bank for given parameters
     unittest.main()

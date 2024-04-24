@@ -92,7 +92,11 @@ class Cxr8Dataset(Dataset):
             np.average(image),
             np.std(image),
         )
-        image = 0.5 + (image - image_avg) / (3.0 * image_std)
+        # image = 0.5 + (image - image_avg) / (3.0 * image_std)
+        image = image - image_avg
+        image = image / (0.66 * image_std)
+        image = 1.0/(1.0 + np.exp(-image))
+        print(f"image pre-clahe sigmoid: min={np.min(image)}, max={np.max(image)}")
 
         # image = cv2.normalize(image, None, 0.0, 1.0, cv2.NORM_MINMAX)
         image_clahe_16 = self.apply_clahe(self.clahe_16, image)
@@ -124,7 +128,8 @@ class Cxr8Dataset(Dataset):
         return image_result.astype(np.float32)
 
     def apply_clahe(self, clahe_filter, image):
-        image = image * 255.0
+        # image = 1.0/(1.0*np.exp(-image))
+        image = image * 255.0        
         image = np.clip(image, 0.0, 255.0)
         image = image.astype(np.uint8)
         image = clahe_filter.apply(image)
@@ -138,7 +143,17 @@ class Cxr8Dataset(Dataset):
             f"image min/max/avg = {image_min}, {image_max}, {image_avg:.4f}, {image_std:.4f}"
         )
         # normalize to 4*std
-        image = 0.5 + (image - image_avg) / (3.0 * image_std)
+        norm = "min_max"
+        if norm == "min_max":
+            image = (image - image_min) / (image_max - image_min)
+        elif norm == "sigmoid":
+            image = image - image_avg
+            image = image / (0.96 * image_std)
+            image = 1.0/(1.0 + np.exp(-image))        
+            logging.debug(f"image post-clahe sigmoid: min={np.min(image)}, max={np.max(image)}")            
+        elif norm == "stddev":
+            image = 0.5 + (image - image_avg) / (3.0 * image_std)        
+        
         image = image.astype(np.float32)
         return image
 
@@ -250,6 +265,8 @@ def infer_vae(device, input_size: Tuple[int, int, int], source_dir: str):
     )
 
     bone_cmap = mpl.colormaps['bone']
+    bone_cmap = mpl.colors.LinearSegmentedColormap("bone_gm", mpl._cm.datad['bone'], 256, gamma=1.5)
+
     gamma = mpl.colors.PowerNorm(gamma=2.1, vmin=0.0, vmax=1.1)
 
     for n in range(0, len(infer_dataset)):
@@ -287,10 +304,10 @@ def infer_vae(device, input_size: Tuple[int, int, int], source_dir: str):
             # TODO: move to show_utils
             mpl.image.imsave(
                 f"reconst_cxr8\{fn}_{ch}.png",
-                np.around(25.0 * slice_image, decimals=0),
+                np.around(120.0 * slice_image, decimals=0),
                 vmin=0.0,
-                vmax=25.0,
-                cmap="bone",
+                vmax=120.0,
+                cmap=bone_cmap, # "bone",
             )
 
         # TODO: implement bokeh shifter front end

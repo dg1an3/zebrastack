@@ -159,7 +159,7 @@ class Encoder(nn.Module):
             kernel_size=init_kernel_size,
             frequencies=None,
             directions=directions,
-            out_res="/2",
+            out_res="^2",
         )
         self.oriented_powermap_2.to(device)
 
@@ -169,7 +169,7 @@ class Encoder(nn.Module):
             kernel_size=init_kernel_size,
             frequencies=None,
             directions=directions,
-            out_res="/2",
+            out_res="^2",
         )
         self.oriented_powermap_3.to(device)
         self.oriented_powermap_4 = OrientedPowerMap(

@@ -12,6 +12,11 @@ import matplotlib.pyplot as plt
 
 matplotlib.use("agg")
 
+_LUTSIZE = 256
+bone_gm = matplotlib.colors.LinearSegmentedColormap(
+    "bone_gm", matplotlib._cm.datad["bone"], _LUTSIZE, gamma=1.5
+)
+
 
 def show_summary(model, input_size):
     """_summary_
@@ -127,33 +132,33 @@ def plot_samples(
 
     # print(v.shape)
     for n in range(2):
-        ax[0][n * 3].imshow(np.squeeze(x[n, 1, ...]), vmin=0.0, vmax=1.0, cmap="bone")
+        ax[0][n * 3].imshow(np.squeeze(x[n, 1, ...]), vmin=0.0, vmax=1.0, cmap=bone_gm)
         ax[1][n * 3].imshow(np.squeeze(blend_data_1[n]))  # cmap='bone')
         ax[2][n * 3].imshow(
             np.around(400.0 * np.squeeze(x_recon[n, 1, ...]), decimals=0),
             vmin=0.0,
             vmax=400.0,
-            cmap="bone",
+            cmap=bone_gm,
         )
         ax[0][n * 3 + 1].imshow(
-            np.squeeze(x[n, 2, ...]), vmin=0.0, vmax=1.0, cmap="bone"
+            np.squeeze(x[n, 2, ...]), vmin=0.0, vmax=1.0, cmap=bone_gm
         )
         ax[1][n * 3 + 1].imshow(np.squeeze(blend_data_2[n]))  # cmap='bone')
         ax[2][n * 3 + 1].imshow(
             np.around(400.0 * np.squeeze(x_recon[n, 2, ...]), decimals=0),
             vmin=0.0,
             vmax=400.0,
-            cmap="bone",
+            cmap=bone_gm,
         )
         ax[0][n * 3 + 2].imshow(
-            np.squeeze(x[n, 3, ...]), vmin=0.0, vmax=1.0, cmap="bone"
+            np.squeeze(x[n, 3, ...]), vmin=0.0, vmax=1.0, cmap=bone_gm
         )
         ax[1][n * 3 + 2].imshow(np.squeeze(blend_data_3[n]))  # cmap='bone')
         ax[2][n * 3 + 2].imshow(
             np.around(400.0 * np.squeeze(x_recon[n, 3, ...]), decimals=0),
             vmin=0.0,
             vmax=400.0,
-            cmap="bone",
+            cmap=bone_gm,
         )
 
     fig.tight_layout()
