@@ -39,6 +39,14 @@ def match_histograms(fixed, moving):
 
     return moving
 
+def adjust_gamma(image, gamma=1.0):
+	# build a lookup table mapping the pixel values [0, 255] to
+	# their adjusted gamma values
+	invGamma = 1.0 / gamma
+	table = np.array([((i / 255.0) ** invGamma) * 255
+		for i in np.arange(0, 256)]).astype("uint8")
+	# apply gamma correction using the lookup table
+	return cv2.LUT(image, table)
 
 class Cxr8Dataset(Dataset):
     """class that represents the CXR8 chest x-ray dataset, with some pre-processing"""
@@ -72,20 +80,24 @@ class Cxr8Dataset(Dataset):
         else:
             self.input_size = sz
 
-        clip_limit = 4
-        self.clahe_16 = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=(36, 36))
-        self.clahe_8 = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=(12, 12))
+        clip_limit = 10
 
-        self.clahe_4 = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=(4, 4))
+        self.clahe_filters = [
+            cv2.createCLAHE(
+                clipLimit=clip_limit, tileGridSize=(tile_grid_size, tile_grid_size)
+            )
+            for tile_grid_size in [16, 8, 4]
+        ]
+        self.cache = {}
 
-        self.pos_encode_channels = 0
-        self.B = np.random.normal(loc=0, scale=1.0, size=(self.pos_encode_channels, 2))
 
     def read_img_file(self, img_name: str):
         img_name = self.root_path / "images" / img_name
         img_name = str(img_name)
         # print(f"img_name {img_name}")
-
+        if img_name in self.cache:
+            return self.cache[img_name]
+        
         image = cv2.imread(img_name, cv2.IMREAD_GRAYSCALE)
         image = cv2.resize(image, self.input_size)
         image_avg, image_std = (
@@ -95,67 +107,75 @@ class Cxr8Dataset(Dataset):
         # image = 0.5 + (image - image_avg) / (3.0 * image_std)
         image = image - image_avg
         image = image / (0.66 * image_std)
-        image = 1.0/(1.0 + np.exp(-image))
-        print(f"image pre-clahe sigmoid: min={np.min(image)}, max={np.max(image)}")
+        image = 1.0 / (1.0 + np.exp(-image))
+        logging.debug(f"image pre-clahe sigmoid: min={np.min(image)}, max={np.max(image)}")
 
-        # image = cv2.normalize(image, None, 0.0, 1.0, cv2.NORM_MINMAX)
-        image_clahe_16 = self.apply_clahe(self.clahe_16, image)
-        image_clahe_8 = self.apply_clahe(self.clahe_8, image)
-        image_clahe_4 = self.apply_clahe(self.clahe_4, image)
-
-        # TODO: create positional encoding channels
-        coords = np.linspace(0, 1, self.input_size[0], endpoint=False)
-        grid = np.stack(np.meshgrid(coords, coords), axis=-1)
-        scale = 7.0
-        grid_proj = scale * (2.0 * np.pi * grid) @ self.B.T
-        # grid_sin_cos = np.concatenate([np.sin(x_grid), np.cos(y_grid)], axis=-1)
-        # print(grid_sin_cos.shape)
         channel_list = [
-            image,
-            image_clahe_4,
-            image_clahe_8,
-            image_clahe_16,
+            self.apply_clahe(filter, image, angles=[0,30,60]) for filter in self.clahe_filters
         ]
-        for n in range(self.pos_encode_channels):
-            channel_list += [
-                np.sin(grid_proj[..., n]),
-                np.cos(grid_proj[..., n]),
-            ]
+
         image_result = np.stack(
-            channel_list,
+            channel_list + [image],
             axis=-1,
         )
-        return image_result.astype(np.float32)
+        image_result = image_result.astype(np.float32)
 
-    def apply_clahe(self, clahe_filter, image):
+        # self.cache[img_name] = image_result
+        return image_result
+
+    def apply_clahe(self, clahe_filter, image, angles):
         # image = 1.0/(1.0*np.exp(-image))
-        image = image * 255.0        
+        image = image * 255.0
         image = np.clip(image, 0.0, 255.0)
         image = image.astype(np.uint8)
-        image = clahe_filter.apply(image)
-        image_min, image_max, image_avg, image_std = (
-            np.min(image),
-            np.max(image),
-            np.average(image),
-            np.std(image),
-        )
-        logging.debug(
-            f"image min/max/avg = {image_min}, {image_max}, {image_avg:.4f}, {image_std:.4f}"
-        )
-        # normalize to 4*std
-        norm = "min_max"
-        if norm == "min_max":
-            image = (image - image_min) / (image_max - image_min)
-        elif norm == "sigmoid":
-            image = image - image_avg
-            image = image / (0.96 * image_std)
-            image = 1.0/(1.0 + np.exp(-image))        
-            logging.debug(f"image post-clahe sigmoid: min={np.min(image)}, max={np.max(image)}")            
-        elif norm == "stddev":
-            image = 0.5 + (image - image_avg) / (3.0 * image_std)        
-        
-        image = image.astype(np.float32)
-        return image
+    
+        # image = adjust_gamma(image, gamma=1.15)
+
+        # add padding and rotate
+        pad_thick = 64
+        image = np.pad(image, pad_width=[(pad_thick,pad_thick),(pad_thick,pad_thick)], mode="reflect")
+        image_center = tuple(np.array(image.shape[1::-1]) / 2)
+
+        acc_image = None
+        for angle in angles:
+            rot_mat = cv2.getRotationMatrix2D(image_center, angle, 1.0)
+            rot_image = cv2.warpAffine(image, rot_mat, image.shape[1::-1], flags=cv2.INTER_LINEAR)
+
+            rot_image = clahe_filter.apply(rot_image)
+            image_min, image_max, image_avg, image_std = (
+                np.min(rot_image),
+                np.max(rot_image),
+                np.average(rot_image),
+                np.std(rot_image),
+            )
+            logging.debug(
+                f"image min/max/avg = {image_min}, {image_max}, {image_avg:.4f}, {image_std:.4f}"
+            )
+            # normalize to 4*std
+            norm = "min_max"
+            if norm == "min_max":
+                rot_image = (rot_image - image_min) / (image_max - image_min)
+            elif norm == "sigmoid":
+                rot_image = rot_image - image_avg
+                rot_image = rot_image / (0.96 * image_std)
+                rot_image = 1.0 / (1.0 + np.exp(-rot_image))
+                logging.debug(
+                    f"image post-clahe sigmoid: min={np.min(rot_image)}, max={np.max(rot_image)}"
+                )
+            elif norm == "stddev":
+                rot_image = 0.5 + (rot_image - image_avg) / (3.0 * image_std)
+
+            rot_mat = cv2.getRotationMatrix2D(image_center, -angle, 1.0)
+            rot_image = cv2.warpAffine(rot_image, rot_mat, rot_image.shape[1::-1], flags=cv2.INTER_LINEAR)
+            rot_image = rot_image[pad_thick:-pad_thick,pad_thick:-pad_thick]
+
+            rot_image = rot_image.astype(np.float32)
+            if acc_image is None:
+                acc_image = rot_image
+            else:
+                acc_image += rot_image
+
+        return acc_image * (1.0/float(len(angles)))
 
     def __len__(self):
         return len(self.data_entry_df)
@@ -264,8 +284,10 @@ def infer_vae(device, input_size: Tuple[int, int, int], source_dir: str):
         ),
     )
 
-    bone_cmap = mpl.colormaps['bone']
-    bone_cmap = mpl.colors.LinearSegmentedColormap("bone_gm", mpl._cm.datad['bone'], 256, gamma=1.5)
+    bone_cmap = mpl.colormaps["bone"]
+    bone_cmap = mpl.colors.LinearSegmentedColormap(
+        "bone_gm", mpl._cm.datad["bone"], 256, gamma=1.5
+    )
 
     gamma = mpl.colors.PowerNorm(gamma=2.1, vmin=0.0, vmax=1.1)
 
