@@ -56,7 +56,7 @@ class OrientedPowerMap(nn.Module):
         if frequencies:
             self.frequencies = frequencies
         else:
-            self.frequencies = [1.0, 0.5, 0.25] # [2.0, 1.0, 0.5, 0.25, 0.125]
+            self.frequencies = [1.0, 0.5, 0.25]  # [2.0, 1.0, 0.5, 0.25, 0.125]
 
         self.directions = directions
 
@@ -69,14 +69,16 @@ class OrientedPowerMap(nn.Module):
             )
         else:
             if kernels_and_freqs is None:
-                self.freq_per_kernel, kernels = make_oriented_map_stack_phases(
-                    device,
-                    in_channels=in_channels,
-                    kernel_size=kernel_size,
-                    directions=directions,
+                self.freq_per_kernel, self.orig_kernels = (
+                    make_oriented_map_stack_phases(
+                        device,
+                        in_channels=in_channels,
+                        kernel_size=kernel_size,
+                        directions=directions,
+                    )
                 )
             else:
-                self.freq_per_kernel, kernels = kernels_and_freqs
+                self.freq_per_kernel, self.orig_kernels = kernels_and_freqs
 
         kernel_count = len(self.freq_per_kernel)
         print(f"len(freq_per_kernel) = {kernel_count}")
@@ -92,7 +94,7 @@ class OrientedPowerMap(nn.Module):
         # torch.nn.init.normal_(conv_pre.bias, 0.0, 1e-1)
 
         # TODO: rename to conv_gabor
-        conv_1 = nn.Conv2d(
+        self.conv_1 = nn.Conv2d(
             in_channels,
             kernel_count,
             kernel_size=kernel_size,
@@ -101,7 +103,9 @@ class OrientedPowerMap(nn.Module):
             padding_mode="replicate",
             bias=True,
         )
-        conv_1.weight = torch.nn.Parameter(kernels, requires_grad=True)
+        self.conv_1.weight = torch.nn.Parameter(
+            self.orig_kernels.clone(), requires_grad=False
+        )
 
         self.se = SqueezeExcitation(
             input_channels=kernel_count,
@@ -132,13 +136,13 @@ class OrientedPowerMap(nn.Module):
 
         self.conv = nn.Sequential(
             conv_pre,
-            conv_1,
+            self.conv_1,
             nn.BatchNorm2d(kernel_count),
             nn.ReLU(True),
             change_res,
             self.se,
             self.conv_2,
-            nn.LeakyReLU(True),
+            nn.ReLU(True),
         )
 
         self.shortcut = nn.Sequential(
@@ -155,6 +159,9 @@ class OrientedPowerMap(nn.Module):
 
         self.in_planes = kernel_count // 2
         self.out_channels = self.conv_2.out_channels
+
+    def basis_reset(self, loss_func):
+        return loss_func(self.orig_kernels, self.conv_1.weight)
 
     def forward(self, x):
         """_summary_

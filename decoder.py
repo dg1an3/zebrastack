@@ -232,6 +232,13 @@ class Decoder(nn.Module):
         )
         self.conv_transpose_4.to(device)
 
+    def basis_reset(self, loss_func):
+        loss_sum = 0.0
+        for module in self.modules():
+            if isinstance(module, OrientedPowerMap):
+                loss_sum += module.basis_reset(loss_func)
+        return loss_sum
+    
     def forward_dict(self, x):
         """_summary_
 
@@ -275,9 +282,20 @@ class Decoder(nn.Module):
         x_v4_back = self.residual_blocks(x)
 
         # x_v4_back = self.conv_transpose_1(x_v4_2_back)
-        x_v2_back = self.conv_transpose_2(x_v4_back)
-        x_v1_back = self.conv_transpose_3(x_v2_back)
-        x_back = self.conv_transpose_4(x_v1_back)
+        mask_v4 = torch.abs(x_v4_back) < ((1e-1)*torch.rand_like(x_v4_back))
+        print(f"masking v4 back with {mask_v4.sum()} of {mask_v4.numel()} zeros")
+        x_v4_back_sparse = torch.masked_fill(x_v4_back, mask_v4, 0.0)
+        x_v2_back = self.conv_transpose_2(x_v4_back_sparse)
+
+        mask_v2 = torch.abs(x_v2_back) < ((1e-1)*torch.rand_like(x_v2_back))
+        print(f"masking v2 back with {mask_v2.sum()} of {mask_v2.numel()} zeros")
+        x_v2_back_sparse = torch.masked_fill(x_v2_back, mask_v2, 0.0)
+        x_v1_back = self.conv_transpose_3(x_v2_back_sparse)
+
+        mask_v1 = torch.abs(x_v1_back) < ((1e-1)*torch.rand_like(x_v1_back))
+        print(f"masking v1 back with {mask_v1.sum()}  of {mask_v1.numel()} zeros")
+        x_v1_back_sparse = torch.masked_fill(x_v1_back, mask_v1, 0.0)
+        x_back = self.conv_transpose_4(x_v1_back_sparse)
 
         return {
             "x_v4_back": x_v4_back,

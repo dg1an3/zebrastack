@@ -389,6 +389,13 @@ class Encoder(nn.Module):
         self.fc_mu = nn.Linear(self.input_size_to_fc.numel(), latent_dim)
         self.fc_log_var = nn.Linear(self.input_size_to_fc.numel(), latent_dim)
 
+    def basis_reset(self, loss_func):
+        loss_sum = 0.0
+        for module in self.modules():
+            if isinstance(module, OrientedPowerMap):
+                loss_sum += module.basis_reset(loss_func)
+        return loss_sum
+
     def forward_dict(self, x):
         """perform forward pass and accumulate intermediate results
 

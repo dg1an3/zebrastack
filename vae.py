@@ -76,6 +76,7 @@ def vae_loss(
     x_v2_back,
     x_v1_back,
     x_back,
+    basis_reset,
 ):
     """compute the total VAE loss, including reconstruction error and kullback-liebler divergence with a unit gaussian
 
@@ -109,15 +110,13 @@ def vae_loss(
         if weight < 1e-6:
             continue
         # for value, value_back in [(x, x_back)]:
-        recon_loss += 0.1 * (
-            loss_func(
-                x[:, 0:4, ...],
-                x_back[:, 0:4, ...] # , reduction="mean"
-            ) * weight
+        recon_loss += 0.9 * (
+            loss_func(x[:, 0:4, ...], x_back[:, 0:4, ...])  # , reduction="mean"
+            * weight
         )
 
         if x_v1 is not None:
-            recon_loss += 0.9 * (
+            recon_loss += 0.1 * (
                 F.cross_entropy(
                     x_v1,
                     x_v1_back,
@@ -145,7 +144,7 @@ def vae_loss(
             )
 
     kld_loss = -0.5 * torch.mean(1 + log_var - mu.pow(2) - log_var.exp())
-    return recon_loss, kld_loss, recon_loss + beta * kld_loss
+    return recon_loss, kld_loss, recon_loss + beta * kld_loss + basis_reset
 
 
 def reparameterize(mu, log_var):
@@ -202,15 +201,17 @@ class VAE(nn.Module):
         # prepare the STN preprocessor
         # TODO: separate STN in to its own module, so it can be invoked on inputs to:
         #           calculate xform and lut; and apply transform and lut to inputs
-        stn_oriented_phasemap_1 = self.encoder.oriented_powermap
-        stn_oriented_phasemap_2 = self.encoder.oriented_powermap_2
-        stn_oriented_phasemap_3 = self.encoder.oriented_powermap_3
+        # stn_oriented_phasemap_1 = self.encoder.oriented_powermap
+        # stn_oriented_phasemap_2 = self.encoder.oriented_powermap_2
+        # stn_oriented_phasemap_3 = self.encoder.oriented_powermap_3
         # stn_oriented_phasemap_4 = self.encoder.oriented_powermap_4
         self.localization = nn.Sequential(
-            stn_oriented_phasemap_1,
-            stn_oriented_phasemap_2,
-            stn_oriented_phasemap_3,
-            # stn_oriented_phasemap_4,
+            nn.Conv2d(4, 8, kernel_size=7),
+            nn.MaxPool2d(2, stride=2),
+            nn.ReLU(True),
+            nn.Conv2d(8, 10, kernel_size=5),
+            nn.MaxPool2d(2, stride=2),
+            nn.ReLU(True)
         )
 
         # for name, param in self.localization.named_parameters():
@@ -276,7 +277,7 @@ class VAE(nn.Module):
         shear = shear.view(-1, 1)
         # shear = torch.clamp(shear, -eps, eps)
 
-        scale_factor = 0.0  # 1e+1
+        scale_factor = 3e-1
         scale_x, scale_y = (
             torch.sigmoid(scale_factor * fc_xform_out[:, 3]) + 0.5,
             torch.sigmoid(scale_factor * fc_xform_out[:, 4]) + 0.5,
@@ -293,7 +294,7 @@ class VAE(nn.Module):
         # print(f"ca = {ca}")
         # print(f"sa = {sa}")
 
-        xlate_factor = 1e-1
+        xlate_factor = 3e-1
         x_shift = xlate_factor * fc_xform_out[:, 0]
         x_shift = x_shift.view(-1, 1)
         # x_shift = torch.clamp(x_shift, -eps, eps)
@@ -330,7 +331,7 @@ class VAE(nn.Module):
 
         # TODO: move STN resampling to dataset (with metadata csv)
 
-        return x_final
+        return x_moved
 
     def forward_dict(self, x):
         """perform forward pass, returning a dictionary of useful results for loss functions
@@ -478,6 +479,7 @@ def train_vae(device, input_size=(512, 512), train_stn=False, l1_weight=0.9):
         device (torch.Device): device to host training
     """
     from cxr8_dataset import Cxr8Dataset
+
     # TODO: move dataset preparation to cxr8_dataset.py
     data_temp_path = os.environ["DATA_TEMP"]
     root_path = Path(data_temp_path) / "cxr8"
@@ -488,6 +490,12 @@ def train_vae(device, input_size=(512, 512), train_stn=False, l1_weight=0.9):
         transform=transforms.Compose(
             [
                 transforms.ToTensor(),
+                transforms.RandomAffine(
+                    degrees=5.0,
+                    translate=(0.05, 0.05),
+                    scale=(0.9, 1.1),
+                    interpolation=transforms.InterpolationMode.BILINEAR,
+                ),
             ]
         ),
     )
@@ -495,15 +503,16 @@ def train_vae(device, input_size=(512, 512), train_stn=False, l1_weight=0.9):
     input_size = train_dataset[0]["image"].shape
     logging.info(f"input_size = {input_size}")
 
-    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+    train_loader = DataLoader(train_dataset, batch_size=20, shuffle=True)
     logging.info(f"train_dataset length = {len(train_dataset)}")
 
+    latent_dim =  4 * 4 # 16 * 16  #
     model, optimizer, start_epoch = load_model(
         input_size,
         device,
         kernel_size=9,
         directions=7,
-        latent_dim=32 * 32,  # 16 * 16,
+        latent_dim=latent_dim,
         train_stn=train_stn,
     )
     logging.info(set([p.device for p in model.parameters()]))
@@ -515,9 +524,19 @@ def train_vae(device, input_size=(512, 512), train_stn=False, l1_weight=0.9):
     train_loss = 0
     train_count = -10
 
+    # now do an iteration of train_dream
+    if start_epoch > 10:
+        train_dream(
+            device, model, optimizer, latent_dim=latent_dim, start_epoch=start_epoch
+        )
+
     # release from this batch
     torch.cuda.empty_cache()
     for batch_idx, batch in enumerate(train_loader):
+        import random
+
+        if random.randint(0, 1) > 0:
+            continue
         x = batch["image"].to(device)
 
         optimizer.zero_grad()
@@ -528,14 +547,28 @@ def train_vae(device, input_size=(512, 512), train_stn=False, l1_weight=0.9):
         result_dict["x_v4"] = None
         # result_dict = clamp_01(result_dict)
 
+        # now perform 2ND iteration
+        result_dict_2 = model.forward_dict(result_dict["x_back"])
+        result_dict_2["x_back"] += result_dict["x_back"]
+        # result_dict["x_v1"] = None
+        result_dict_2["x_v2"] = None
+        result_dict_2["x_v4"] = None
+        # result_dict = clamp_01(result_dict)
+
+        basis_reset = model.encoder.basis_reset(F.mse_loss) + model.decoder.basis_reset(
+            F.mse_loss
+        )
+        print(f"basis_reset value = {basis_reset}")
+
         recon_loss, kldiv_loss, loss = vae_loss(
             recon_loss_metrics=(
-                (F.l1_loss, l1_weight),
+                (F.mse_loss, l1_weight),
                 (F.binary_cross_entropy, (1.0 - l1_weight)),
             ),
-            beta=1e-1,
+            beta=2e+0,
             x=x,
-            **result_dict,
+            basis_reset=basis_reset,
+            **result_dict_2,
         )
 
         loss.backward()
@@ -551,6 +584,14 @@ def train_vae(device, input_size=(512, 512), train_stn=False, l1_weight=0.9):
         if train_count % 3 == 2:
             x_xform = model.stn(x)
 
+            result_dict_for_plot = model.encoder.forward_dict(x)
+            latent_vec = result_dict_for_plot["mu"]
+            # latent_vec += 2.0 * torch.randn_like(latent_vec, device=device)
+            # bring the vector 1/2 way to origin
+            print(f"latent vector length = {torch.norm(latent_vec[0,...], 1)}")
+            latent_vec *= 1.0
+            x_reconst_for_plot = model.decoder.forward_dict(latent_vec)
+
             plot_samples(
                 model,
                 start_epoch,
@@ -559,7 +600,8 @@ def train_vae(device, input_size=(512, 512), train_stn=False, l1_weight=0.9):
                 batch_idx,
                 x,
                 x_xform,
-                result_dict["x_back"],
+                x_reconst_for_plot["x_back"],
+                # result_dict["x_back"],
                 recon_loss,
                 kldiv_loss,
             )
@@ -586,6 +628,77 @@ def train_vae(device, input_size=(512, 512), train_stn=False, l1_weight=0.9):
     )
 
     logging.info("completed training")
+
+
+def train_dream(device, model, optimizer, latent_dim, start_epoch):
+    train_loss = 0
+    train_count = -10
+    for batch_idx in range(100):
+        # generate batch of gaussian in latent space
+        x_latent = torch.randn((32, latent_dim)).to(device)
+
+        optimizer.zero_grad()
+
+        decoder_back_dict = model.decoder.forward_dict(x_latent)
+        forward_dict = model.encoder.forward_dict(decoder_back_dict["x_back"])
+        if True:
+            x_latent_back = forward_dict["mu"]
+        else:
+            x_latent_back = reparameterize(forward_dict["mu"], forward_dict["log_var"])
+
+        basis_reset = model.encoder.basis_reset(F.mse_loss) + model.decoder.basis_reset(
+            F.mse_loss
+        )
+        print(f"basis_reset value = {basis_reset}")
+
+        recon_loss = F.mse_loss(x_latent_back, x_latent)
+        #recon_loss = F.l1_loss(x_latent_back, x_latent)
+
+        beta = 1e-1
+        if True:
+            kldiv_loss = 0.1
+        else:
+            kldiv_loss = -0.5 * torch.mean(
+                1
+                + forward_dict["log_var"]
+                - forward_dict["mu"].pow(2)
+                - forward_dict["log_var"].exp()
+            )
+
+        loss = recon_loss + kldiv_loss * beta + basis_reset
+
+        loss.backward()
+        # print(f"loss = {loss}; {'nan' if loss.isnan() else ''}")
+
+        # torch.nn.utils.clip_grad.clip_grad_norm_(model.parameters(), max_norm=2.0)
+        optimizer.step()
+
+        # bit of logic to wait before starting to accumulate loss
+        train_count += 1.0 if train_count != -1.0 else 2.0
+        train_loss = loss.item() + (train_loss if train_count > 0.0 else 0.0)
+
+        if train_count % 3 == 2:
+            x_xform = model.stn(decoder_back_dict["x_back"])
+
+            plot_samples(
+                model,
+                start_epoch,
+                train_loss,
+                train_count,
+                batch_idx,
+                decoder_back_dict["x_back"],
+                x_xform,
+                decoder_back_dict["x_back"],
+                recon_loss,
+                kldiv_loss,
+            )
+
+            # torch.cuda.empty_cache()
+
+        logging.info(f"Epoch {start_epoch+1}: Batch {batch_idx}")
+        logging.info(
+            f"Loss: {train_loss / train_count:.6f} ({recon_loss:.6f}/{kldiv_loss:.6f})"
+        )
 
 
 ####
@@ -663,11 +776,11 @@ if "__main__" == __name__:
     if args.train:
         # train_vae(device, train_stn=True, train_non_stn=True, l1_weight=0.7)
         for _ in range(3):
-            for l1_weight in [0.9, 0.4]:  # 0.7, 0.9]:
-                for train_stn in [True]:
+            for train_stn in [True, False]:
+                for l1_weight in [0.9, 0.3]:
                     train_vae(
                         device,
-                        input_size=(256,256),
+                        input_size=(256, 256),
                         train_stn=train_stn,
                         l1_weight=l1_weight,
                     )
