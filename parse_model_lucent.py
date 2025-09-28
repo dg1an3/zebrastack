@@ -218,7 +218,7 @@ def create_random_objective(
     Args:
         model: PyTorch model
         layers_list: List of layer names to choose from
-        objective_type: Type of objective - "channel", "neuron", "center_3x3"
+        objective_type: Type of objective - "channel", "neuron", "center_3x3", "center_5x5", "center_7x7"
         sampled_channels: Number of channels to sample
 
     Returns:
@@ -246,14 +246,25 @@ def create_random_objective(
 
         if objective_type == "neuron":
             objectives_list.append(objectives.neuron(layer_name, channel_idx))
-        elif objective_type == "center_3x3":
-            obj = create_center_3x3_objective(layer_name, channel_idx)
-            if obj:
-                objectives_list.append(obj)
-            else:
-                print(
-                    f"Failed to create 3x3 center objective for {layer_name}:{channel_idx}"
-                )
+        elif objective_type.startswith("center_") and objective_type.endswith("x" + objective_type.split("x")[-1]):
+            # Parse the size from strings like "center_3x3", "center_5x5", "center_7x7"
+            try:
+                size_str = objective_type.replace("center_", "")
+                if "x" in size_str:
+                    size = int(size_str.split("x")[0])
+                    obj = create_center_nxn_objective(layer_name, channel_idx, size)
+                    if obj:
+                        objectives_list.append(obj)
+                    else:
+                        print(
+                            f"Failed to create {size}x{size} center objective for {layer_name}:{channel_idx}"
+                        )
+                        # Fallback to channel objective
+                        objectives_list.append(objectives.channel(layer_name, channel_idx))
+                else:
+                    raise ValueError(f"Invalid center objective format: {objective_type}")
+            except (ValueError, IndexError) as e:
+                print(f"Error parsing objective type '{objective_type}': {e}")
                 # Fallback to channel objective
                 objectives_list.append(objectives.channel(layer_name, channel_idx))
         else:  # default to channel
@@ -262,21 +273,30 @@ def create_random_objective(
     return sum(objectives_list)
 
 
-def create_center_3x3_objective(layer_name, channel_idx, spatial_weight=1.0):
+def create_center_nxn_objective(layer_name, channel_idx, size=3, spatial_weight=1.0):
     """
-    Create an objective that targets a 3x3 array of neurons at the center of a feature map.
+    Create an objective that targets an NxN array of neurons at the center of a feature map.
 
     Args:
         layer_name: Name of the layer
         channel_idx: Channel index
+        size: Size of the center region (e.g., 3 for 3x3, 5 for 5x5, 7 for 7x7)
         spatial_weight: Weight for the spatial averaging (default 1.0)
 
     Returns:
-        Lucent objective targeting 3x3 center neurons
+        Lucent objective targeting NxN center neurons
     """
     try:
-        # Create a custom objective that targets the center 3x3 region
-        def center_3x3_obj(model):
+        # Ensure size is odd for symmetric centering
+        if size % 2 == 0:
+            print(f"Warning: Even size {size} provided, using {size+1} for symmetric centering")
+            size += 1
+        
+        # Calculate the radius (how many pixels from center)
+        radius = size // 2
+        
+        # Create a custom objective that targets the center NxN region
+        def center_nxn_obj(model):
             # Get the activations for the specified layer and channel
             layer_acts = model(layer_name)
 
@@ -292,24 +312,69 @@ def create_center_3x3_objective(layer_name, channel_idx, spatial_weight=1.0):
             # Calculate center coordinates
             center_h, center_w = h // 2, w // 2
 
-            # Define 3x3 region around center (with bounds checking)
-            h_start = max(0, center_h - 1)
-            h_end = min(h, center_h + 2)
-            w_start = max(0, center_w - 1)
-            w_end = min(w, center_w + 2)
+            # Define NxN region around center (with bounds checking)
+            h_start = max(0, center_h - radius)
+            h_end = min(h, center_h + radius + 1)
+            w_start = max(0, center_w - radius)
+            w_end = min(w, center_w + radius + 1)
 
-            # Extract 3x3 center region
+            # Extract NxN center region
             center_region = layer_acts[:, channel_idx, h_start:h_end, w_start:w_end]
 
             # Return negative mean (Lucent maximizes by minimizing negative)
             return -center_region.mean() * spatial_weight
 
         # Create the objective using Lucent's Objective class
-        return objectives.Objective(center_3x3_obj)
+        return objectives.Objective(center_nxn_obj)
 
     except Exception as e:
-        print(f"Error creating 3x3 center objective: {e}")
+        print(f"Error creating {size}x{size} center objective: {e}")
         return None
+
+
+def create_center_3x3_objective(layer_name, channel_idx, spatial_weight=1.0):
+    """
+    Backward compatibility wrapper for create_center_nxn_objective with size=3.
+    
+    Args:
+        layer_name: Name of the layer
+        channel_idx: Channel index
+        spatial_weight: Weight for the spatial averaging (default 1.0)
+    
+    Returns:
+        Lucent objective targeting 3x3 center neurons
+    """
+    return create_center_nxn_objective(layer_name, channel_idx, size=3, spatial_weight=spatial_weight)
+
+
+def create_center_5x5_objective(layer_name, channel_idx, spatial_weight=1.0):
+    """
+    Convenience function for creating 5x5 center objectives.
+    
+    Args:
+        layer_name: Name of the layer
+        channel_idx: Channel index
+        spatial_weight: Weight for the spatial averaging (default 1.0)
+    
+    Returns:
+        Lucent objective targeting 5x5 center neurons
+    """
+    return create_center_nxn_objective(layer_name, channel_idx, size=5, spatial_weight=spatial_weight)
+
+
+def create_center_7x7_objective(layer_name, channel_idx, spatial_weight=1.0):
+    """
+    Convenience function for creating 7x7 center objectives.
+    
+    Args:
+        layer_name: Name of the layer
+        channel_idx: Channel index
+        spatial_weight: Weight for the spatial averaging (default 1.0)
+    
+    Returns:
+        Lucent objective targeting 7x7 center neurons
+    """
+    return create_center_nxn_objective(layer_name, channel_idx, size=7, spatial_weight=spatial_weight)
 
 
 def create_custom_spatial_objective(layer_name, channel_idx, positions=None):
@@ -450,7 +515,7 @@ def get_channels_from_lucent_name(model, lucent_layer_name):
 
 
 def main():
-    """Demonstrate the layer analysis functions"""
+    """Demonstrate the layer analysis functions and new center objectives"""
     print("=== Lucent Layer Analysis Demo ===")
 
     # Load a model (using Inception V1 as example)
@@ -470,6 +535,46 @@ def main():
     print(f"Found {len(visualizable)} visualizable layers")
     print("First 10 layers:", visualizable[:10])
 
+    # Test the new center objective functionality
+    if visualizable:
+        print("\n2. Testing new center objective sizes...")
+        
+        # Test different center objective types
+        objective_types = ['channel', 'neuron', 'center_3x3', 'center_5x5', 'center_7x7']
+        
+        for obj_type in objective_types:
+            print(f"\nTesting {obj_type} objective...")
+            try:
+                obj = create_random_objective(model, visualizable, objective_type=obj_type, sampled_channels=1)
+                if obj:
+                    print(f"  ✅ Successfully created {obj_type} objective!")
+                else:
+                    print(f"  ❌ Failed to create {obj_type} objective")
+            except Exception as e:
+                print(f"  ❌ Error creating {obj_type} objective: {e}")
+        
+        # Test direct function calls
+        print("\n3. Testing direct function calls...")
+        test_layer = visualizable[0] if visualizable else "mixed4a_1x1_pre_relu_conv"
+        test_channel = 42
+        
+        center_functions = [
+            ('3x3', create_center_3x3_objective),
+            ('5x5', create_center_5x5_objective), 
+            ('7x7', create_center_7x7_objective),
+            ('NxN (size=9)', lambda layer, channel: create_center_nxn_objective(layer, channel, size=9))
+        ]
+        
+        for size_name, func in center_functions:
+            try:
+                obj = func(test_layer, test_channel)
+                if obj:
+                    print(f"  ✅ {size_name} center objective created successfully")
+                else:
+                    print(f"  ❌ {size_name} center objective creation returned None")
+            except Exception as e:
+                print(f"  ❌ {size_name} center objective failed: {e}")
+
     # If no visualizable layers found, let's debug further
     if len(visualizable) == 0:
         print("\nDebug: Testing specific layers...")
@@ -482,7 +587,7 @@ def main():
 
     # Get detailed information
     if visualizable:
-        print("\n2. Getting detailed layer information...")
+        print("\n4. Getting detailed layer information...")
         detailed = get_visualizable_layers(model, include_detailed_info=True)
         print("Sample layer details:")
         for i, (name, info) in enumerate(list(detailed.items())[:5]):
@@ -493,6 +598,13 @@ def main():
     legacy_test()
 
     print("\n=== Demo Complete ===")
+    print("\nAvailable objective types:")
+    print("- 'channel': Standard channel objective")
+    print("- 'neuron': Single neuron objective")
+    print("- 'center_3x3': 3x3 center array")
+    print("- 'center_5x5': 5x5 center array")
+    print("- 'center_7x7': 7x7 center array")
+    print("- Or use create_center_nxn_objective(layer, channel, size=N) for any odd size N")
 
 
 # Legacy test function (keeping for backwards compatibility)
