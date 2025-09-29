@@ -211,7 +211,7 @@ def get_module_by_name(model, layer_name):
 
 
 def create_random_objective(
-    model, layers_list, objective_type="channel", sampled_channels=2
+    model, layers_list, layer_name=None, objective_type="channel", sampled_channels=2
 ):
     """Create a random objective with valid channel index
 
@@ -225,7 +225,8 @@ def create_random_objective(
         Combined objective or None if failed
     """
     # Pick a random layer
-    layer_name = random.choice(layers_list)
+    if not layer_name:
+        layer_name = random.choice(layers_list)
 
     # Get the number of channels for this layer
     num_channels = get_channels_from_lucent_name(model, layer_name)
