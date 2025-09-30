@@ -211,15 +211,19 @@ def get_module_by_name(model, layer_name):
 
 
 def create_random_objective(
-    model, layers_list, layer_name=None, objective_type="channel", sampled_channels=2
+    model, layers_list, layer_name=None, objective_type="channel", sampled_channels=2,
+    second_objective_type=None, second_offset=None
 ):
-    """Create a random objective with valid channel index
+    """Create a random objective with valid channel index, optionally with a second offset objective
 
     Args:
         model: PyTorch model
         layers_list: List of layer names to choose from
+        layer_name: Specific layer name to use (if None, picks random)
         objective_type: Type of objective - "channel", "neuron", "center_3x3", "center_5x5", "center_7x7"
         sampled_channels: Number of channels to sample
+        second_objective_type: Optional second objective type with offset
+        second_offset: (x,y) offset for second objective (positive = right, negative = left)
 
     Returns:
         Combined objective or None if failed
@@ -261,7 +265,7 @@ def create_random_objective(
                             f"Failed to create {size}x{size} center objective for {layer_name}:{channel_idx}"
                         )
                         # Fallback to channel objective
-                        objectives_list.append(objectives.channel(layer_name, channel_idx))
+                        objectives_list.append(objectives.channel(layer_name, channel_idx))                    
                 else:
                     raise ValueError(f"Invalid center objective format: {objective_type}")
             except (ValueError, IndexError) as e:
@@ -271,21 +275,58 @@ def create_random_objective(
         else:  # default to channel
             objectives_list.append(objectives.channel(layer_name, channel_idx))
 
+    for n in range(sampled_channels):
+        # Add second objective with offset if specified
+        if second_objective_type is not None:
+            print(f"\nAdding second objective: {second_objective_type} with offset ({second_offset})")
+            
+            # Pick a random channel for the second objective
+            second_channel_idx = random.randint(0, num_channels - 1)
+            print(f"Second objective channel: {second_channel_idx}")
+            
+            if second_objective_type == "neuron":
+                # For neuron objectives, we can't apply spatial offset, so use regular neuron
+                objectives_list.append(objectives.neuron(layer_name, second_channel_idx))
+                print("Note: Neuron objectives don't support spatial offset")
+            elif second_objective_type.startswith("center_") and "x" in second_objective_type:
+                # Parse the size and create offset objective
+                try:
+                    size_str = second_objective_type.replace("center_", "")
+                    size = int(size_str.split("x")[0])
+                    second_obj = create_center_nxn_objective(
+                        layer_name, second_channel_idx, size, 
+                        x_offset=second_offset[0], y_offset=second_offset[1]
+                    )
+                    if second_obj:
+                        objectives_list.append(second_obj)
+                        print(f"✅ Created {size}x{size} offset objective at ({second_offset})")
+                    else:
+                        print("❌ Failed to create second objective, using channel fallback")
+                        objectives_list.append(objectives.channel(layer_name, second_channel_idx))
+                except (ValueError, IndexError) as e:
+                    print(f"Error parsing second objective type: {e}")
+                    objectives_list.append(objectives.channel(layer_name, second_channel_idx))
+            else:  # default second objective to channel
+                objectives_list.append(objectives.channel(layer_name, second_channel_idx))
+                print("Second objective defaulted to channel (no offset applied)")
+
     return sum(objectives_list)
 
 
-def create_center_nxn_objective(layer_name, channel_idx, size=3, spatial_weight=1.0):
+def create_center_nxn_objective(layer_name, channel_idx, size=3, spatial_weight=1.0, x_offset=0, y_offset=0):
     """
-    Create an objective that targets an NxN array of neurons at the center of a feature map.
+    Create an objective that targets an NxN array of neurons at a specified position in a feature map.
 
     Args:
         layer_name: Name of the layer
         channel_idx: Channel index
-        size: Size of the center region (e.g., 3 for 3x3, 5 for 5x5, 7 for 7x7)
+        size: Size of the region (e.g., 3 for 3x3, 5 for 5x5, 7 for 7x7)
         spatial_weight: Weight for the spatial averaging (default 1.0)
+        x_offset: Horizontal offset from center (positive = right, negative = left)
+        y_offset: Vertical offset from center (positive = down, negative = up)
 
     Returns:
-        Lucent objective targeting NxN center neurons
+        Lucent objective targeting NxN region at specified offset
     """
     try:
         # Ensure size is odd for symmetric centering
@@ -296,8 +337,8 @@ def create_center_nxn_objective(layer_name, channel_idx, size=3, spatial_weight=
         # Calculate the radius (how many pixels from center)
         radius = size // 2
         
-        # Create a custom objective that targets the center NxN region
-        def center_nxn_obj(model):
+        # Create a custom objective that targets the offset NxN region
+        def offset_nxn_obj(model):
             # Get the activations for the specified layer and channel
             layer_acts = model(layer_name)
 
@@ -312,21 +353,34 @@ def create_center_nxn_objective(layer_name, channel_idx, size=3, spatial_weight=
 
             # Calculate center coordinates
             center_h, center_w = h // 2, w // 2
+            
+            # Apply offsets
+            target_h = center_h + y_offset
+            target_w = center_w + x_offset
 
-            # Define NxN region around center (with bounds checking)
-            h_start = max(0, center_h - radius)
-            h_end = min(h, center_h + radius + 1)
-            w_start = max(0, center_w - radius)
-            w_end = min(w, center_w + radius + 1)
+            # Define NxN region around target position (with bounds checking)
+            h_start = max(0, target_h - radius)
+            h_end = min(h, target_h + radius + 1)
+            w_start = max(0, target_w - radius)
+            w_end = min(w, target_w + radius + 1)
+            
+            # Check if the offset region is valid (not entirely out of bounds)
+            if h_start >= h or w_start >= w or h_end <= 0 or w_end <= 0:
+                print(f"Warning: Offset region ({x_offset}, {y_offset}) is out of bounds for {h}x{w} feature map")
+                # Fallback to center region
+                h_start = max(0, center_h - radius)
+                h_end = min(h, center_h + radius + 1)
+                w_start = max(0, center_w - radius)
+                w_end = min(w, center_w + radius + 1)
 
-            # Extract NxN center region
-            center_region = layer_acts[:, channel_idx, h_start:h_end, w_start:w_end]
+            # Extract NxN offset region
+            offset_region = layer_acts[:, channel_idx, h_start:h_end, w_start:w_end]
 
             # Return negative mean (Lucent maximizes by minimizing negative)
-            return -center_region.mean() * spatial_weight
+            return -offset_region.mean() * spatial_weight
 
         # Create the objective using Lucent's Objective class
-        return objectives.Objective(center_nxn_obj)
+        return objectives.Objective(offset_nxn_obj)
 
     except Exception as e:
         print(f"Error creating {size}x{size} center objective: {e}")
@@ -376,6 +430,140 @@ def create_center_7x7_objective(layer_name, channel_idx, spatial_weight=1.0):
         Lucent objective targeting 7x7 center neurons
     """
     return create_center_nxn_objective(layer_name, channel_idx, size=7, spatial_weight=spatial_weight)
+
+
+def create_corner_objectives(layer_name, channel_idx, size=3, spatial_weight=1.0):
+    """
+    Create objectives for all four corners of a feature map.
+    
+    Args:
+        layer_name: Name of the layer
+        channel_idx: Channel index
+        size: Size of the region (default 3x3)
+        spatial_weight: Weight for the spatial averaging (default 1.0)
+    
+    Returns:
+        Dict with objectives for 'top_left', 'top_right', 'bottom_left', 'bottom_right'
+    """
+    # Calculate large offsets to reach corners (will be clamped by bounds checking)
+    large_offset = 50  # Arbitrary large number
+    
+    return {
+        'top_left': create_center_nxn_objective(layer_name, channel_idx, size, spatial_weight, -large_offset, -large_offset),
+        'top_right': create_center_nxn_objective(layer_name, channel_idx, size, spatial_weight, large_offset, -large_offset),
+        'bottom_left': create_center_nxn_objective(layer_name, channel_idx, size, spatial_weight, -large_offset, large_offset),
+        'bottom_right': create_center_nxn_objective(layer_name, channel_idx, size, spatial_weight, large_offset, large_offset)
+    }
+
+
+def create_edge_objectives(layer_name, channel_idx, size=3, spatial_weight=1.0, edge_offset=10):
+    """
+    Create objectives for the edges (top, bottom, left, right) of a feature map.
+    
+    Args:
+        layer_name: Name of the layer
+        channel_idx: Channel index
+        size: Size of the region (default 3x3)
+        spatial_weight: Weight for the spatial averaging (default 1.0)
+        edge_offset: How far from center to place the edge objectives
+    
+    Returns:
+        Dict with objectives for 'top', 'bottom', 'left', 'right'
+    """
+    return {
+        'top': create_center_nxn_objective(layer_name, channel_idx, size, spatial_weight, 0, -edge_offset),
+        'bottom': create_center_nxn_objective(layer_name, channel_idx, size, spatial_weight, 0, edge_offset),
+        'left': create_center_nxn_objective(layer_name, channel_idx, size, spatial_weight, -edge_offset, 0),
+        'right': create_center_nxn_objective(layer_name, channel_idx, size, spatial_weight, edge_offset, 0)
+    }
+
+
+def create_grid_objectives(layer_name, channel_idx, size=3, spatial_weight=1.0, grid_spacing=5):
+    """
+    Create a 3x3 grid of objectives across the feature map.
+    
+    Args:
+        layer_name: Name of the layer
+        channel_idx: Channel index
+        size: Size of each region (default 3x3)
+        spatial_weight: Weight for the spatial averaging (default 1.0)
+        grid_spacing: Spacing between grid points
+    
+    Returns:
+        Dict with objectives for a 3x3 grid of positions
+    """
+    positions = {
+        'top_left': (-grid_spacing, -grid_spacing),
+        'top_center': (0, -grid_spacing),
+        'top_right': (grid_spacing, -grid_spacing),
+        'center_left': (-grid_spacing, 0),
+        'center': (0, 0),
+        'center_right': (grid_spacing, 0),
+        'bottom_left': (-grid_spacing, grid_spacing),
+        'bottom_center': (0, grid_spacing),
+        'bottom_right': (grid_spacing, grid_spacing)
+    }
+    
+    return {
+        name: create_center_nxn_objective(layer_name, channel_idx, size, spatial_weight, x_off, y_off)
+        for name, (x_off, y_off) in positions.items()
+    }
+
+
+def create_dual_objective_presets(model, layers_list, preset="center_vs_corner"):
+    """
+    Create common dual objective combinations.
+    
+    Args:
+        model: PyTorch model
+        layers_list: List of layer names to choose from
+        preset: Preset combination type:
+            - "center_vs_corner": Center 3x3 + corner 3x3
+            - "center_vs_edge": Center 5x5 + edge 3x3  
+            - "left_vs_right": Left edge 3x3 + right edge 3x3
+            - "top_vs_bottom": Top edge 3x3 + bottom edge 3x3
+    
+    Returns:
+        Combined objective or None if failed
+    """
+    presets = {
+        "center_vs_corner": {
+            "primary": "center_3x3",
+            "secondary": "center_3x3", 
+            "x_offset": 8, "y_offset": 8
+        },
+        "center_vs_edge": {
+            "primary": "center_5x5",
+            "secondary": "center_3x3",
+            "x_offset": 0, "y_offset": -10
+        },
+        "left_vs_right": {
+            "primary": "center_3x3",
+            "secondary": "center_3x3",
+            "x_offset": -10, "y_offset": 0
+        },
+        "top_vs_bottom": {
+            "primary": "center_3x3", 
+            "secondary": "center_3x3",
+            "x_offset": 0, "y_offset": 10
+        }
+    }
+    
+    if preset not in presets:
+        print(f"Unknown preset: {preset}. Available: {list(presets.keys())}")
+        return None
+    
+    config = presets[preset]
+    print(f"Creating dual objective preset: {preset}")
+    
+    return create_random_objective(
+        model, layers_list,
+        objective_type=config["primary"],
+        sampled_channels=1,  # Use 1 channel for cleaner dual objectives
+        second_objective_type=config["secondary"],
+        second_x_offset=config["x_offset"],
+        second_y_offset=config["y_offset"]
+    )
 
 
 def create_custom_spatial_objective(layer_name, channel_idx, positions=None):

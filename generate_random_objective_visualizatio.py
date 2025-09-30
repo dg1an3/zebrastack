@@ -80,9 +80,18 @@ def log_visualization_params(
 
 while True:
     use_objective = random.choice(
-        ["channel", "neuron", "center_3x3", "center_5x5", "center_7x7"]
+        # ["channel"] +  
+        ["neuron"]
+        # + ["center_3x3"] 
+        # + ["center_5x5", "center_7x7"]
     )
-    sampled_channels = random.randint(1, 18)
+    second_objective = random.choice(
+        #[None] +
+        ["neuron"]
+        #+ ["center_3x3"]
+        #+ ["center_5x5", "center_7x7"]
+    )
+    sampled_channels = random.randint(1, 9)
 
     logger.info(
         "\nStarting new batch with %s objective, %d channels",
@@ -96,55 +105,61 @@ while True:
         good_layers,
         layer_name=layer_name,
         objective_type=use_objective,
+        second_objective_type=second_objective,
         sampled_channels=sampled_channels,
+        second_offset=(random.randint(-5, 5), random.randint(-5, 5)),
     )
 
     if obj is None:
         logger.warning("Failed to create objective, skipping batch")
         continue
 
-    # Base visualization (no transforms)
-    base_filename = generate_filename(
-        use_objective, sampled_channels, "base", layer_name
-    )
-    os.makedirs(os.path.dirname(base_filename), exist_ok=True)
-    logger.info("Generating base visualization: %s", base_filename)
+    gen_base = False
+    if gen_base:
+        # Base visualization (no transforms)
+        base_filename = generate_filename(
+            use_objective, sampled_channels, "base", layer_name
+        )
+        os.makedirs(os.path.dirname(base_filename), exist_ok=True)
+        logger.info("Generating base visualization: %s", base_filename)
 
-    _ = render.render_vis(
-        model,
-        objective_f=obj,
-        param_f=lambda: param.image(256),
-        show_image=False,
-        save_image=True,
-        image_name=base_filename,
-    )
+        _ = render.render_vis(
+            model,
+            objective_f=obj,
+            param_f=lambda: param.image(256),
+            show_image=False,
+            save_image=True,
+            image_name=base_filename,
+        )
 
-    log_visualization_params(
-        use_objective, sampled_channels, None, base_filename, "base"
-    )
+        log_visualization_params(
+            use_objective, sampled_channels, None, base_filename, "base"
+        )
 
     # %%
     # Adding jitter, notice that the visualization is much less noisy!
 
-    jitter_only = [transform.jitter(8)]
-    jitter_filename = generate_filename(
-        use_objective, sampled_channels, "jitter", layer_name
-    )
-    logger.info("Generating jitter visualization: %s", jitter_filename)
+    gen_jitter = False
+    if gen_jitter:
+        jitter_only = [transform.jitter(8)]
+        jitter_filename = generate_filename(
+            use_objective, sampled_channels, "jitter", layer_name
+        )
+        logger.info("Generating jitter visualization: %s", jitter_filename)
 
-    _ = render.render_vis(
-        model,
-        obj,
-        transforms=jitter_only,
-        param_f=lambda: param.image(256),
-        show_image=False,
-        save_image=True,
-        image_name=jitter_filename,
-    )
+        _ = render.render_vis(
+            model,
+            obj,
+            transforms=jitter_only,
+            param_f=lambda: param.image(256),
+            show_image=False,
+            save_image=True,
+            image_name=jitter_filename,
+        )
 
-    log_visualization_params(
-        use_objective, sampled_channels, "jitter(8)", jitter_filename, "jitter"
-    )
+        log_visualization_params(
+            use_objective, sampled_channels, "jitter(8)", jitter_filename, "jitter"
+        )
 
     # %%
     # Adding a whole suite of transforms!
