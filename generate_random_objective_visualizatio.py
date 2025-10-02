@@ -80,18 +80,18 @@ def log_visualization_params(
 
 while True:
     use_objective = random.choice(
-        # ["channel"] +  
+        # ["channel"] +
         ["neuron"]
-        # + ["center_3x3"] 
+        # + ["center_3x3"]
         # + ["center_5x5", "center_7x7"]
     )
     second_objective = random.choice(
-        #[None] +
+        # [None] +
         ["neuron"]
-        #+ ["center_3x3"]
-        #+ ["center_5x5", "center_7x7"]
+        # + ["center_3x3"]
+        # + ["center_5x5", "center_7x7"]
     )
-    sampled_channels = random.randint(1, 9)
+    sampled_channels = random.randint(1, 8)
 
     logger.info(
         "\nStarting new batch with %s objective, %d channels",
@@ -99,15 +99,18 @@ while True:
         sampled_channels,
     )
 
+    num_of_points = random.randint(1, 7)
     layer_name = random.choice(good_layers)
     obj = create_random_objective(
         model,
         good_layers,
         layer_name=layer_name,
-        objective_type=use_objective,
-        second_objective_type=second_objective,
+        objective_types=["neuron"] * num_of_points,
+        offsets=[
+            (random.randint(-4, 4), random.randint(-4, 4))
+            for _ in range(num_of_points - 1)
+        ],
         sampled_channels=sampled_channels,
-        second_offset=(random.randint(-5, 5), random.randint(-5, 5)),
     )
 
     if obj is None:
@@ -126,7 +129,7 @@ while True:
         _ = render.render_vis(
             model,
             objective_f=obj,
-            param_f=lambda: param.image(256),
+            param_f=lambda: param.image(384),
             show_image=False,
             save_image=True,
             image_name=base_filename,
@@ -145,13 +148,14 @@ while True:
         jitter_filename = generate_filename(
             use_objective, sampled_channels, "jitter", layer_name
         )
+        os.makedirs(os.path.dirname(jitter_filename), exist_ok=True)        
         logger.info("Generating jitter visualization: %s", jitter_filename)
 
         _ = render.render_vis(
             model,
             obj,
             transforms=jitter_only,
-            param_f=lambda: param.image(256),
+            param_f=lambda: param.image(384),
             show_image=False,
             save_image=True,
             image_name=jitter_filename,
@@ -177,6 +181,7 @@ while True:
     full_transforms_filename = generate_filename(
         use_objective, sampled_channels, "full_transforms", layer_name
     )
+    os.makedirs(os.path.dirname(full_transforms_filename), exist_ok=True)    
     logger.info(f"Generating full transforms visualization: {full_transforms_filename}")
 
     transform_details = "pad(16), jitter(8), random_scale(0.8-1.2), random_rotate(-10 to +10), jitter(2)"
@@ -184,7 +189,7 @@ while True:
     _ = render.render_vis(
         model,
         objective_f=obj,
-        param_f=lambda: param.image(256),
+        param_f=lambda: param.image(384),
         transforms=all_transforms,
         show_image=False,
         save_image=True,
