@@ -6,6 +6,69 @@ from lucent.modelzoo import inceptionv1
 from lucent.modelzoo.util import get_model_layers
 
 
+def get_layer_dimensions(model, layer_name, input_size=224):
+    """
+    Get the spatial dimensions (height, width) of a layer's output.
+
+    Args:
+        model: PyTorch model
+        layer_name: Name of the layer (Lucent format with underscores)
+        input_size: Input image size (default 224 for most models)
+
+    Returns:
+        tuple: (height, width, channels) or None if failed
+    """
+    model.eval()
+    device = next(model.parameters()).device
+
+    # Create a dummy input
+    dummy_input = torch.randn(1, 3, input_size, input_size).to(device)
+
+    try:
+        with torch.no_grad():
+            # Forward pass and capture activations
+            activations = {}
+
+            def hook_fn(name):
+                def hook(module, input, output):
+                    activations[name] = output
+
+                return hook
+
+            # Register hooks for all modules
+            hooks = []
+            for name, module in model.named_modules():
+                # Convert PyTorch naming to Lucent naming
+                lucent_name = name.replace(".", "_")
+                if lucent_name == layer_name:
+                    hook = module.register_forward_hook(hook_fn(lucent_name))
+                    hooks.append(hook)
+
+            # Forward pass
+            _ = model(dummy_input)
+
+            # Clean up hooks
+            for hook in hooks:
+                hook.remove()
+
+            # Get dimensions
+            if layer_name in activations:
+                output = activations[layer_name]
+                if len(output.shape) == 4:  # [batch, channels, height, width]
+                    _, channels, height, width = output.shape
+                    return (height, width, channels)
+                else:
+                    print(f"Layer {layer_name} has shape {output.shape} (not 4D)")
+                    return None
+            else:
+                print(f"Layer {layer_name} not found in activations")
+                return None
+
+    except Exception as e:
+        print(f"Error getting dimensions for {layer_name}: {e}")
+        return None
+
+
 def get_visualizable_layers(model, include_detailed_info=False):
     """
     Get all layers in a PyTorch model that can be visualized by Lucent.
@@ -310,7 +373,7 @@ def create_objective_for_layer(
             layer_name,
             channel_idx,
             size,
-            spatial_weight=random.uniform(-1.0, 1.0),            
+            spatial_weight=random.uniform(-1.0, 1.0),
             x_offset=with_offset[0],
             y_offset=with_offset[1],
         )

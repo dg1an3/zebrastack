@@ -7,7 +7,7 @@ import torch
 from lucent.optvis import render, param, transform
 from lucent_layer_utils import get_visualizable_layers
 from lucent.modelzoo import inceptionv1, inception_v3, resnet152, resnext101_64x4d
-from parse_model_lucent import create_random_objective
+from parse_model_lucent import create_random_objective, get_layer_dimensions
 
 # Setup logging
 log_filename = (
@@ -99,15 +99,24 @@ while True:
         sampled_channels,
     )
 
+    gen_image_sz = 384
     num_of_points = random.randint(1, 7)
     layer_name = random.choice(good_layers)
+    height, width, channels = get_layer_dimensions(
+        model, layer_name, input_size=gen_image_sz
+    )
+
+    # offset_range = height // 4
     obj = create_random_objective(
         model,
         good_layers,
         layer_name=layer_name,
         objective_types=["neuron"] * num_of_points,
         offsets=[
-            (random.randint(-4, 4), random.randint(-4, 4))
+            (
+                random.randint(-width//4, width//4),
+                random.randint(-height//6, height//6),
+            )
             for _ in range(num_of_points - 1)
         ],
         sampled_channels=sampled_channels,
@@ -129,7 +138,7 @@ while True:
         _ = render.render_vis(
             model,
             objective_f=obj,
-            param_f=lambda: param.image(384),
+            param_f=lambda: param.image(gen_image_sz),
             show_image=False,
             save_image=True,
             image_name=base_filename,
@@ -148,14 +157,14 @@ while True:
         jitter_filename = generate_filename(
             use_objective, sampled_channels, "jitter", layer_name
         )
-        os.makedirs(os.path.dirname(jitter_filename), exist_ok=True)        
+        os.makedirs(os.path.dirname(jitter_filename), exist_ok=True)
         logger.info("Generating jitter visualization: %s", jitter_filename)
 
         _ = render.render_vis(
             model,
             obj,
             transforms=jitter_only,
-            param_f=lambda: param.image(384),
+            param_f=lambda: param.image(gen_image_sz),
             show_image=False,
             save_image=True,
             image_name=jitter_filename,
@@ -181,7 +190,7 @@ while True:
     full_transforms_filename = generate_filename(
         use_objective, sampled_channels, "full_transforms", layer_name
     )
-    os.makedirs(os.path.dirname(full_transforms_filename), exist_ok=True)    
+    os.makedirs(os.path.dirname(full_transforms_filename), exist_ok=True)
     logger.info(f"Generating full transforms visualization: {full_transforms_filename}")
 
     transform_details = "pad(16), jitter(8), random_scale(0.8-1.2), random_rotate(-10 to +10), jitter(2)"
@@ -189,7 +198,7 @@ while True:
     _ = render.render_vis(
         model,
         objective_f=obj,
-        param_f=lambda: param.image(384),
+        param_f=lambda: param.image(gen_image_sz),
         transforms=all_transforms,
         show_image=False,
         save_image=True,
