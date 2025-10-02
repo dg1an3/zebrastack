@@ -50,6 +50,10 @@ logger.info("Sample layers: %s...", good_layers[:5])
 # Initialize counter for unique image identification
 image_counter = 0
 
+GENERATED_IMAGE_SIZE = 384
+GENERATE_BASE_IMAGE = False
+GENERATE_JITTER_IMAGE = False
+
 
 def generate_filename(
     objective_type, sampled_channels, transform_type="base", layer_name=None
@@ -78,19 +82,17 @@ def log_visualization_params(
     logger.info("-" * 40)
 
 
-while True:
+def main():
     use_objective = random.choice(
-        # ["channel"] +
-        ["neuron"]
-        # + ["center_3x3"]
-        # + ["center_5x5", "center_7x7"]
+        ["channel", "neuron", "center_3x3", "center_5x5", "center_7x7"]
     )
+    use_objective = "neuron"
+
     second_objective = random.choice(
-        # [None] +
-        ["neuron"]
-        # + ["center_3x3"]
-        # + ["center_5x5", "center_7x7"]
+        [None, "neuron", "center_3x3", "center_5x5", "center_7x7"]
     )
+    second_objective = "neuron"
+
     sampled_channels = random.randint(1, 8)
 
     logger.info(
@@ -99,11 +101,10 @@ while True:
         sampled_channels,
     )
 
-    gen_image_sz = 384
     num_of_points = random.randint(1, 7)
     layer_name = random.choice(good_layers)
     height, width, channels = get_layer_dimensions(
-        model, layer_name, input_size=gen_image_sz
+        model, layer_name, input_size=GENERATED_IMAGE_SIZE
     )
 
     # offset_range = height // 4
@@ -111,23 +112,20 @@ while True:
         model,
         good_layers,
         layer_name=layer_name,
-        objective_types=["neuron"] * num_of_points,
+        objective_types=[use_objective] * num_of_points,
         offsets=[
             (
-                random.randint(-width//4, width//4),
-                random.randint(-height//6, height//6),
+                random.randint(-width // 4, width // 4),
+                random.randint(-height // 6, height // 6),
             )
             for _ in range(num_of_points - 1)
         ],
         sampled_channels=sampled_channels,
     )
 
-    if obj is None:
-        logger.warning("Failed to create objective, skipping batch")
-        continue
+    assert obj is not None, "Objective creation failed"
 
-    gen_base = False
-    if gen_base:
+    if GENERATE_BASE_IMAGE:
         # Base visualization (no transforms)
         base_filename = generate_filename(
             use_objective, sampled_channels, "base", layer_name
@@ -138,7 +136,7 @@ while True:
         _ = render.render_vis(
             model,
             objective_f=obj,
-            param_f=lambda: param.image(gen_image_sz),
+            param_f=lambda: param.image(GENERATED_IMAGE_SIZE),
             show_image=False,
             save_image=True,
             image_name=base_filename,
@@ -151,8 +149,7 @@ while True:
     # %%
     # Adding jitter, notice that the visualization is much less noisy!
 
-    gen_jitter = False
-    if gen_jitter:
+    if GENERATE_JITTER_IMAGE:
         jitter_only = [transform.jitter(8)]
         jitter_filename = generate_filename(
             use_objective, sampled_channels, "jitter", layer_name
@@ -164,7 +161,7 @@ while True:
             model,
             obj,
             transforms=jitter_only,
-            param_f=lambda: param.image(gen_image_sz),
+            param_f=lambda: param.image(GENERATED_IMAGE_SIZE),
             show_image=False,
             save_image=True,
             image_name=jitter_filename,
@@ -191,14 +188,16 @@ while True:
         use_objective, sampled_channels, "full_transforms", layer_name
     )
     os.makedirs(os.path.dirname(full_transforms_filename), exist_ok=True)
-    logger.info(f"Generating full transforms visualization: {full_transforms_filename}")
+    logger.info(
+        "Generating full transforms visualization: %s", full_transforms_filename
+    )
 
     transform_details = "pad(16), jitter(8), random_scale(0.8-1.2), random_rotate(-10 to +10), jitter(2)"
 
     _ = render.render_vis(
         model,
         objective_f=obj,
-        param_f=lambda: param.image(gen_image_sz),
+        param_f=lambda: param.image(GENERATED_IMAGE_SIZE),
         transforms=all_transforms,
         show_image=False,
         save_image=True,
@@ -214,6 +213,13 @@ while True:
     )
 
     logger.info(
-        f"Completed batch #{image_counter//3}. Total images generated: {image_counter}"
+        "Completed batch #%d. Total images generated: %d",
+        image_counter // 3,
+        image_counter,
     )
     logger.info("=" * 60)
+
+
+if __name__ == "__main__":
+    for _ in range(1000):
+        main()
