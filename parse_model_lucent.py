@@ -361,8 +361,7 @@ def create_objective_for_layer(
             channel_idx,
             1,
             spatial_weight=random.uniform(-1.0, 1.0),
-            x_offset=with_offset[0],
-            y_offset=with_offset[1],
+            with_offset=with_offset,
         )
 
     elif objective_type.startswith("center_") and "x" in objective_type:
@@ -374,8 +373,7 @@ def create_objective_for_layer(
             channel_idx,
             size,
             spatial_weight=random.uniform(-1.0, 1.0),
-            x_offset=with_offset[0],
-            y_offset=with_offset[1],
+            with_offset=with_offset,
         )
         print(f"✅ Created {size}x{size} offset objective at ({with_offset})")
     elif objective_type != "channel":
@@ -385,7 +383,7 @@ def create_objective_for_layer(
 
 
 def create_center_nxn_objective(
-    layer_name, channel_idx, size=3, spatial_weight=1.0, x_offset=0, y_offset=0
+    layer_name, channel_idx, size=3, spatial_weight=1.0, with_offset=(0, 0)
 ):
     """
     Create an objective that targets an NxN array of neurons at a specified position in a feature map.
@@ -430,8 +428,8 @@ def create_center_nxn_objective(
             center_h, center_w = h // 2, w // 2
 
             # Apply offsets
-            target_h = center_h + y_offset
-            target_w = center_w + x_offset
+            target_h = center_h + with_offset[1]
+            target_w = center_w + with_offset[0]
 
             # Define NxN region around target position (with bounds checking)
             h_start = max(0, target_h - radius)
@@ -442,7 +440,7 @@ def create_center_nxn_objective(
             # Check if the offset region is valid (not entirely out of bounds)
             if h_start >= h or w_start >= w or h_end <= 0 or w_end <= 0:
                 print(
-                    f"Warning: Offset region ({x_offset}, {y_offset}) is out of bounds for {h}x{w} feature map"
+                    f"Warning: Offset region ({with_offset[0]}, {with_offset[1]}) is out of bounds for {h}x{w} feature map"
                 )
                 # Fallback to center region
                 h_start = max(0, center_h - radius)
@@ -533,16 +531,32 @@ def create_corner_objectives(layer_name, channel_idx, size=3, spatial_weight=1.0
 
     return {
         "top_left": create_center_nxn_objective(
-            layer_name, channel_idx, size, spatial_weight, -large_offset, -large_offset
+            layer_name,
+            channel_idx,
+            size,
+            spatial_weight,
+            with_offset=(-large_offset, -large_offset),
         ),
         "top_right": create_center_nxn_objective(
-            layer_name, channel_idx, size, spatial_weight, large_offset, -large_offset
+            layer_name,
+            channel_idx,
+            size,
+            spatial_weight,
+            with_offset=(large_offset, -large_offset),
         ),
         "bottom_left": create_center_nxn_objective(
-            layer_name, channel_idx, size, spatial_weight, -large_offset, large_offset
+            layer_name,
+            channel_idx,
+            size,
+            spatial_weight,
+            with_offset=(-large_offset, large_offset),
         ),
         "bottom_right": create_center_nxn_objective(
-            layer_name, channel_idx, size, spatial_weight, large_offset, large_offset
+            layer_name,
+            channel_idx,
+            size,
+            spatial_weight,
+            with_offset=(large_offset, large_offset),
         ),
     }
 
@@ -565,16 +579,16 @@ def create_edge_objectives(
     """
     return {
         "top": create_center_nxn_objective(
-            layer_name, channel_idx, size, spatial_weight, 0, -edge_offset
+            layer_name, channel_idx, size, spatial_weight, with_offset=(0, -edge_offset)
         ),
         "bottom": create_center_nxn_objective(
-            layer_name, channel_idx, size, spatial_weight, 0, edge_offset
+            layer_name, channel_idx, size, spatial_weight, with_offset=(0, edge_offset)
         ),
         "left": create_center_nxn_objective(
-            layer_name, channel_idx, size, spatial_weight, -edge_offset, 0
+            layer_name, channel_idx, size, spatial_weight, with_offset=(-edge_offset, 0)
         ),
         "right": create_center_nxn_objective(
-            layer_name, channel_idx, size, spatial_weight, edge_offset, 0
+            layer_name, channel_idx, size, spatial_weight, with_offset=(edge_offset, 0)
         ),
     }
 
@@ -609,7 +623,7 @@ def create_grid_objectives(
 
     return {
         name: create_center_nxn_objective(
-            layer_name, channel_idx, size, spatial_weight, x_off, y_off
+            layer_name, channel_idx, size, spatial_weight, with_offset=(x_off, y_off)
         )
         for name, (x_off, y_off) in positions.items()
     }
