@@ -3,6 +3,7 @@ import datetime
 import os
 import random
 import logging
+from typing import Optional, Dict, Any
 import torch
 from lucent.optvis import render, param, transform
 from lucent_layer_utils import get_visualizable_layers
@@ -23,26 +24,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Log session start
-logger.info("=" * 60)
-logger.info("Starting new visualization generation session")
-logger.info("Log file: %s", log_filename)
-logger.info("=" * 60)
-
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-logger.info("Using device: %s", device)
-
-model = resnext101_64x4d(pretrained=True)
-model = resnet152(pretrained=True)
-model = inception_v3(pretrained=True)
-model = inceptionv1(pretrained=True)
-_ = model.to(device).eval()
-
-logger.info("Loaded model: %s", type(model).__name__)
-
-good_layers = get_visualizable_layers(model)
-logger.info("Found %d visualizable layers", len(good_layers))
-logger.info("Sample layers: %s...", good_layers[:5])
 
 # %%
 # hoping for a favorite!
@@ -56,8 +37,11 @@ GENERATE_JITTER_IMAGE = False
 
 
 def generate_filename(
-    objective_type, sampled_channels, transform_type="base", layer_name=None
-):
+    objective_type: str,
+    sampled_channels: int,
+    transform_type: str = "base",
+    layer_name: Optional[str] = None,
+) -> str:
     """Generate filename with timestamp and parameters"""
     global image_counter
     image_counter += 1
@@ -68,8 +52,13 @@ def generate_filename(
 
 
 def log_visualization_params(
-    objective_type, sampled_channels, layer_info, image_filename, transform_type="base"
-):
+    objective_type: str,
+    sampled_channels: int,
+    layer_info: Optional[Dict[str, Any]],
+    image_filename: str,
+    model: torch.nn.Module,
+    transform_type: str = "base",
+) -> None:
     """Log all visualization parameters"""
     logger.info("Generated visualization #%d:", image_counter)
     logger.info("  Image: %s", image_filename)
@@ -82,16 +71,11 @@ def log_visualization_params(
     logger.info("-" * 40)
 
 
-def main():
+def main(model, good_layers):
     use_objective = random.choice(
         ["channel", "neuron", "center_3x3", "center_5x5", "center_7x7"]
     )
     use_objective = "neuron"
-
-    second_objective = random.choice(
-        [None, "neuron", "center_3x3", "center_5x5", "center_7x7"]
-    )
-    second_objective = "neuron"
 
     sampled_channels = random.randint(1, 8)
 
@@ -221,5 +205,25 @@ def main():
 
 
 if __name__ == "__main__":
+    # Log session start
+    logger.info("=" * 60)
+    logger.info("Starting new visualization generation session")
+    logger.info("Log file: %s", log_filename)
+    logger.info("=" * 60)
+
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    logger.info("Using device: %s", device)
+
+    model = resnext101_64x4d(pretrained=True)
+    model = resnet152(pretrained=True)
+    model = inception_v3(pretrained=True)
+    model = inceptionv1(pretrained=True)
+    _ = model.to(device).eval()
+
+    logger.info("Loaded model: %s", type(model).__name__)
+
+    good_layers = get_visualizable_layers(model)
+    logger.info("Found %d visualizable layers", len(good_layers))
+    logger.info("Sample layers: %s...", good_layers[:5])
     for _ in range(1000):
-        main()
+        main(model, good_layers)
