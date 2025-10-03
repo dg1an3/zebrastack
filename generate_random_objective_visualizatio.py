@@ -3,7 +3,7 @@ import datetime
 import os
 import random
 import logging
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 import torch
 from lucent.optvis import render, param, transform
 from lucent_layer_utils import get_visualizable_layers
@@ -71,7 +71,7 @@ def log_visualization_params(
     logger.info("-" * 40)
 
 
-def main(model, layers):
+def main(model: torch.nn.Module, layers: List[str]) -> None:
     use_objective = random.choice(
         ["channel", "neuron", "center_3x3", "center_5x5", "center_7x7"]
     )
