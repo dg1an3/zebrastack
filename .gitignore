@@ -4,3 +4,4 @@ __pycache__/
 onnx/
 screen_captures/
 visualization_log_*.txt
+IISStaticSite/
