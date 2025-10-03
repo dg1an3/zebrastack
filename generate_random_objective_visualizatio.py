@@ -1,4 +1,6 @@
-# generate_random_objective_visualizations.ipynb
+""" _generate_random_objective_visualizations.py
+Generates and saves random objective visualizations for various CNN models
+"""
 import datetime
 import os
 import random
@@ -11,14 +13,14 @@ from lucent.modelzoo import inceptionv1, inception_v3, resnet152, resnext101_64x
 from parse_model_lucent import create_random_objective, get_layer_dimensions
 
 # Setup logging
-log_filename = (
+LOG_FILENAME = (
     f"visualization_log_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
 )
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
     handlers=[
-        logging.FileHandler(log_filename),
+        logging.FileHandler(LOG_FILENAME),
         logging.StreamHandler(),  # Also print to console
     ],
 )
@@ -45,10 +47,18 @@ def generate_filename(
     """Generate filename with timestamp and parameters"""
     global image_counter
     image_counter += 1
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    base_name: str = "_".join(
+        [
+            datetime.datetime.now().strftime("%Y%m%d_%H%M%S"),
+            f"img{image_counter:04d}",
+            objective_type,
+            f"{sampled_channels}ch",
+            transform_type,
+        ]
+    )
     if layer_name:
-        return f"screen_captures\\{layer_name}\\{timestamp}_img{image_counter:04d}_{objective_type}_{sampled_channels}ch_{transform_type}.png"
-    return f"screen_captures\\{timestamp}_img{image_counter:04d}_{objective_type}_{sampled_channels}ch_{transform_type}.png"
+        return f"screen_captures\\{layer_name}\\{base_name}.png"
+    return f"screen_captures\\{base_name}.png"
 
 
 def log_visualization_params(
@@ -71,7 +81,13 @@ def log_visualization_params(
     logger.info("-" * 40)
 
 
-def main(model: torch.nn.Module, layers: List[str]) -> None:
+def generate_for_model(model: torch.nn.Module, layers: List[str]) -> None:
+    """Generate visualizations for a specific model and its layers.
+
+    Args:
+        model (torch.nn.Module): The model to visualize.
+        layers (List[str]): The layers to visualize.
+    """
     use_objective = random.choice(
         ["channel", "neuron", "center_3x3", "center_5x5", "center_7x7"]
     )
@@ -204,20 +220,17 @@ def main(model: torch.nn.Module, layers: List[str]) -> None:
     logger.info("=" * 60)
 
 
-if __name__ == "__main__":
+def main(use_model):
     # Log session start
     logger.info("=" * 60)
     logger.info("Starting new visualization generation session")
-    logger.info("Log file: %s", log_filename)
+    logger.info("Log file: %s", LOG_FILENAME)
     logger.info("=" * 60)
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     logger.info("Using device: %s", device)
 
-    model = resnext101_64x4d(pretrained=True)
-    model = resnet152(pretrained=True)
-    model = inception_v3(pretrained=True)
-    model = inceptionv1(pretrained=True)
+    model = use_model(pretrained=True)
     _ = model.to(device).eval()
 
     logger.info("Loaded model: %s", type(model).__name__)
@@ -226,4 +239,9 @@ if __name__ == "__main__":
     logger.info("Found %d visualizable layers", len(good_layers))
     logger.info("Sample layers: %s...", good_layers[:5])
     for _ in range(1000):
-        main(model, good_layers)
+        generate_for_model(model, good_layers)
+
+
+if __name__ == "__main__":
+    models_to_choose = [inceptionv1, inception_v3, resnet152, resnext101_64x4d]
+    main(models_to_choose[0])
