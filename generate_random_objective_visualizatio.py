@@ -105,7 +105,7 @@ def generate_for_model(model: torch.nn.Module, layers: List[str]) -> None:
 
     num_of_points = random.randint(1, 7)
     layer_name = random.choice(layers)
-    height, width, channels = get_layer_dimensions(
+    height, width, _ = get_layer_dimensions(
         model, layer_name, input_size=GENERATED_IMAGE_SIZE
     )
 

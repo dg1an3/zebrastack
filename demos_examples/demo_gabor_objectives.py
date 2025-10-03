@@ -29,8 +29,8 @@ def demo_gabor_objectives():
     edge_obj = create_gabor_weighted_objective(
         demo_layer, demo_channel,
         size=7,
-        x_offset=0, y_offset=0,
-        sigma_x=1.5, sigma_y=1.5,
+        with_offset=(0, 0),
+        sigma=(1.5, 1.5),
         theta=0,  # horizontal edges
         lambda_freq=3.0,
         spatial_weight=1.0
@@ -70,10 +70,10 @@ def demo_gabor_objectives():
         obj = create_gabor_weighted_objective(
             demo_layer, demo_channel,
             size=7,
-            x_offset=x_off, y_offset=y_off,
+            with_offset=(x_off, y_off),
             theta=np.pi/4,  # diagonal edges
             lambda_freq=2.5,
-            sigma_x=1.2, sigma_y=1.2
+            sigma=(1.2, 1.2)
         )
         offset_objectives.append((offset_name, obj))
         print(f"  {offset_name} offset ({x_off}, {y_off}): {'✅' if obj else '❌'}")
@@ -105,7 +105,7 @@ def compare_gabor_vs_regular():
     
     print("\n=== Gabor vs Regular Objectives Comparison ===")
     
-    from parse_model_lucent import create_center_nxn_objective
+    from spatial_objectives import create_center_nxn_objective
     
     model = inceptionv1(pretrained=True)
     layers = get_visualizable_layers(model)
@@ -134,7 +134,7 @@ def compare_gabor_vs_regular():
         'gabor_blob': gabor_blob
     }
 
-def generate_gabor_visualization_batch(model, layers, num_examples=3):
+def generate_gabor_visualization_batch(layers, num_examples=3):
     """Generate a batch of visualizations using different Gabor objectives."""
     
     print(f"\n=== Generating {num_examples} Gabor Visualizations ===")
@@ -155,8 +155,8 @@ def generate_gabor_visualization_batch(model, layers, num_examples=3):
         obj = create_gabor_weighted_objective(
             layer, channel,
             size=7,
-            x_offset=x_offset, y_offset=y_offset,
-            sigma_x=sigma, sigma_y=sigma,
+            with_offset=(x_offset, y_offset),
+            sigma=(sigma, sigma),
             theta=theta,
             lambda_freq=lambda_freq
         )
@@ -187,7 +187,7 @@ if __name__ == "__main__":
     # Load model for batch generation
     model = inceptionv1(pretrained=True)
     layers = get_visualizable_layers(model)
-    gabor_batch = generate_gabor_visualization_batch(model, layers, 5)
+    gabor_batch = generate_gabor_visualization_batch(layers, 5)
     
     print("\n" + "="*60)
     print("🎉 All demos completed successfully!")

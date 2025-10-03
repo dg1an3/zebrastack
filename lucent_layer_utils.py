@@ -16,8 +16,6 @@ Works with various model architectures including:
 """
 
 import random
-import torch
-import torch.nn as nn
 from lucent.optvis import objectives
 from lucent.modelzoo.util import get_model_layers
 
@@ -190,7 +188,7 @@ def get_visualizable_layers(model, include_detailed_info=False):
                         if hasattr(module, "stride"):
                             layer_info["stride"] = getattr(module, "stride", None)
 
-                    except:
+                    except Exception:
                         layer_info["type"] = "Unknown"
 
                     layer_details[layer_name] = layer_info

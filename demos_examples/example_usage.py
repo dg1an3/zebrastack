@@ -33,7 +33,7 @@ def demo_inception_v1():
 
     # Create and visualize a random objective
     print("\nCreating random visualization...")
-    obj = create_random_objective(model)
+    obj = create_random_objective(model, layers)
     if obj:
         try:
             # Visualize (this will take some time)

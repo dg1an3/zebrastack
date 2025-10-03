@@ -103,9 +103,9 @@ def create_gabor_weighted_objective(
     print(f"Gabor weight range: [{gabor_weights.min():.3f}, {gabor_weights.max():.3f}]")
 
     # Create a custom objective that targets the Gabor-weighted region
-    def gabor_weighted_obj(model):
+    def gabor_weighted_obj(net):
         # Get the activations for the specified layer and channel
-        layer_acts = model(layer_name)
+        layer_acts = net(layer_name)
 
         if len(layer_acts.shape) != 4:  # Should be [batch, channels, height, width]
             print(
@@ -292,7 +292,7 @@ def visualize_gabor_weights(
 def create_multi_orientation_gabor_objective(
     layer_name,
     channel_idx,
-    orientations=[0, np.pi / 4, np.pi / 2, 3 * np.pi / 4],
+    orientations=None,
     weights=None,
     **gabor_kwargs,
 ):
@@ -309,6 +309,8 @@ def create_multi_orientation_gabor_objective(
     Returns:
         Combined multi-orientation objective
     """
+    if orientations is None:
+        orientations = [0, np.pi / 4, np.pi / 2, 3 * np.pi / 4]
     if weights is None:
         weights = [1.0] * len(orientations)
 

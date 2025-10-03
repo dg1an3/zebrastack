@@ -28,7 +28,7 @@ def get_layer_dimensions(model, layer_name, input_size=224):
             activations = {}
 
             def hook_fn(name):
-                def hook(module, input, output):
+                def hook(_, __, output):
                     activations[name] = output
 
                 return hook
@@ -146,7 +146,7 @@ def get_visualizable_layers(model, include_detailed_info=False):
 
                     layer_details[layer_name] = layer_info
 
-        except Exception as e:
+        except Exception:
             # Skip layers that cause errors
             continue
 
@@ -446,7 +446,7 @@ def main():
         print("\n4. Getting detailed layer information...")
         detailed = get_visualizable_layers(model, include_detailed_info=True)
         print("Sample layer details:")
-        for i, (name, info) in enumerate(list(detailed.items())[:5]):
+        for name, info in list(detailed.items())[:5]:
             print(f"  {name}: {info}")
 
     # Legacy test to see if the basic functions work
