@@ -6,7 +6,7 @@ from gabor_objectives import (
     create_multi_orientation_gabor_objective,
     visualize_gabor_weights
 )
-from parse_model_lucent import get_visualizable_layers
+from lucent_layer_utils import get_visualizable_layers
 from lucent.modelzoo import inceptionv1
 import numpy as np
 
