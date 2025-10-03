@@ -91,7 +91,6 @@ def main(model, good_layers):
         model, layer_name, input_size=GENERATED_IMAGE_SIZE
     )
 
-    # offset_range = height // 4
     obj = create_random_objective(
         model,
         good_layers,

@@ -399,67 +399,62 @@ def create_center_nxn_objective(
     Returns:
         Lucent objective targeting NxN region at specified offset
     """
-    try:
-        # Ensure size is odd for symmetric centering
-        if size % 2 == 0:
+    # Ensure size is odd for symmetric centering
+    if size % 2 == 0:
+        print(
+            f"Warning: Even size {size} provided, using {size+1} for symmetric centering"
+        )
+        size += 1
+
+    # Calculate the radius (how many pixels from center)
+    radius = size // 2
+
+    # Create a custom objective that targets the offset NxN region
+    def offset_nxn_obj(model):
+        # Get the activations for the specified layer and channel
+        layer_acts = model(layer_name)
+
+        if len(layer_acts.shape) != 4:  # Should be [batch, channels, height, width]
             print(
-                f"Warning: Even size {size} provided, using {size+1} for symmetric centering"
+                f"Warning: Layer {layer_name} has unexpected shape {layer_acts.shape}"
             )
-            size += 1
+            return -layer_acts[:, channel_idx].mean()
 
-        # Calculate the radius (how many pixels from center)
-        radius = size // 2
+        # Get spatial dimensions
+        _, _, h, w = layer_acts.shape
 
-        # Create a custom objective that targets the offset NxN region
-        def offset_nxn_obj(model):
-            # Get the activations for the specified layer and channel
-            layer_acts = model(layer_name)
+        # Calculate center coordinates
+        center_h, center_w = h // 2, w // 2
 
-            if len(layer_acts.shape) != 4:  # Should be [batch, channels, height, width]
-                print(
-                    f"Warning: Layer {layer_name} has unexpected shape {layer_acts.shape}"
-                )
-                return -layer_acts[:, channel_idx].mean()
+        # Apply offsets
+        target_h = center_h + with_offset[1]
+        target_w = center_w + with_offset[0]
 
-            # Get spatial dimensions
-            _, _, h, w = layer_acts.shape
+        # Define NxN region around target position (with bounds checking)
+        h_start = max(0, target_h - radius)
+        h_end = min(h, target_h + radius + 1)
+        w_start = max(0, target_w - radius)
+        w_end = min(w, target_w + radius + 1)
 
-            # Calculate center coordinates
-            center_h, center_w = h // 2, w // 2
+        # Check if the offset region is valid (not entirely out of bounds)
+        if h_start >= h or w_start >= w or h_end <= 0 or w_end <= 0:
+            print(
+                f"Warning: Offset region ({with_offset[0]}, {with_offset[1]}) is out of bounds for {h}x{w} feature map"
+            )
+            # Fallback to center region
+            h_start = max(0, center_h - radius)
+            h_end = min(h, center_h + radius + 1)
+            w_start = max(0, center_w - radius)
+            w_end = min(w, center_w + radius + 1)
 
-            # Apply offsets
-            target_h = center_h + with_offset[1]
-            target_w = center_w + with_offset[0]
+        # Extract NxN offset region
+        offset_region = layer_acts[:, channel_idx, h_start:h_end, w_start:w_end]
 
-            # Define NxN region around target position (with bounds checking)
-            h_start = max(0, target_h - radius)
-            h_end = min(h, target_h + radius + 1)
-            w_start = max(0, target_w - radius)
-            w_end = min(w, target_w + radius + 1)
+        # Return negative mean (Lucent maximizes by minimizing negative)
+        return -offset_region.mean() * spatial_weight
 
-            # Check if the offset region is valid (not entirely out of bounds)
-            if h_start >= h or w_start >= w or h_end <= 0 or w_end <= 0:
-                print(
-                    f"Warning: Offset region ({with_offset[0]}, {with_offset[1]}) is out of bounds for {h}x{w} feature map"
-                )
-                # Fallback to center region
-                h_start = max(0, center_h - radius)
-                h_end = min(h, center_h + radius + 1)
-                w_start = max(0, center_w - radius)
-                w_end = min(w, center_w + radius + 1)
-
-            # Extract NxN offset region
-            offset_region = layer_acts[:, channel_idx, h_start:h_end, w_start:w_end]
-
-            # Return negative mean (Lucent maximizes by minimizing negative)
-            return -offset_region.mean() * spatial_weight
-
-        # Create the objective using Lucent's Objective class
-        return objectives.Objective(offset_nxn_obj)
-
-    except Exception as e:
-        print(f"Error creating {size}x{size} center objective: {e}")
-        return None
+    # Create the objective using Lucent's Objective class
+    return objectives.Objective(offset_nxn_obj)
 
 
 def create_center_3x3_objective(layer_name, channel_idx, spatial_weight=1.0):
@@ -750,79 +745,75 @@ def get_channels_from_lucent_name(model, lucent_layer_name):
     # First, try to find the module using the layer name directly
     # This works with Lucent's layer naming convention
 
-    try:
-        # Method 1: Direct lookup using Lucent naming
-        # For some models, the layer names from get_model_layers() can be used directly
-        # to access features during forward pass, but not necessarily as module attributes
+    # Method 1: Direct lookup using Lucent naming
+    # For some models, the layer names from get_model_layers() can be used directly
+    # to access features during forward pass, but not necessarily as module attributes
 
-        # Method 2: Try to find the actual PyTorch module by parsing the name
-        # Different models have different naming conventions
+    # Method 2: Try to find the actual PyTorch module by parsing the name
+    # Different models have different naming conventions
 
-        # Handle Inception V1 style names (e.g., "mixed3a_1x1_pre_relu_conv")
-        if "mixed" in lucent_layer_name:
-            parts = lucent_layer_name.split("_")
-            if len(parts) >= 2:
-                mixed_name = parts[0]  # e.g., "mixed3a"
-                if hasattr(model, mixed_name):
-                    mixed_module = getattr(model, mixed_name)
+    # Handle Inception V1 style names (e.g., "mixed3a_1x1_pre_relu_conv")
+    if "mixed" in lucent_layer_name:
+        parts = lucent_layer_name.split("_")
+        if len(parts) >= 2:
+            mixed_name = parts[0]  # e.g., "mixed3a"
+            if hasattr(model, mixed_name):
+                mixed_module = getattr(model, mixed_name)
 
-                    # Look for the specific branch
-                    branch_name = "_".join(parts[1:-2]) if len(parts) > 3 else parts[1]
-                    if hasattr(mixed_module, branch_name):
-                        branch_module = getattr(mixed_module, branch_name)
-                        if hasattr(branch_module, "conv") and hasattr(
-                            branch_module.conv, "out_channels"
-                        ):
-                            return branch_module.conv.out_channels
-                        elif hasattr(branch_module, "out_channels"):
-                            return branch_module.out_channels
+                # Look for the specific branch
+                branch_name = "_".join(parts[1:-2]) if len(parts) > 3 else parts[1]
+                if hasattr(mixed_module, branch_name):
+                    branch_module = getattr(mixed_module, branch_name)
+                    if hasattr(branch_module, "conv") and hasattr(
+                        branch_module.conv, "out_channels"
+                    ):
+                        return branch_module.conv.out_channels
+                    elif hasattr(branch_module, "out_channels"):
+                        return branch_module.out_channels
 
-        # Handle conv2d style names (e.g., "conv2d0_pre_relu_conv")
-        elif "conv2d" in lucent_layer_name:
-            parts = lucent_layer_name.split("_")
-            conv_name = parts[0]  # e.g., "conv2d0"
-            if hasattr(model, conv_name):
-                conv_module = getattr(model, conv_name)
-                if hasattr(conv_module, "conv") and hasattr(
-                    conv_module.conv, "out_channels"
-                ):
-                    return conv_module.conv.out_channels
-                elif hasattr(conv_module, "out_channels"):
-                    return conv_module.out_channels
+    # Handle conv2d style names (e.g., "conv2d0_pre_relu_conv")
+    elif "conv2d" in lucent_layer_name:
+        parts = lucent_layer_name.split("_")
+        conv_name = parts[0]  # e.g., "conv2d0"
+        if hasattr(model, conv_name):
+            conv_module = getattr(model, conv_name)
+            if hasattr(conv_module, "conv") and hasattr(
+                conv_module.conv, "out_channels"
+            ):
+                return conv_module.conv.out_channels
+            elif hasattr(conv_module, "out_channels"):
+                return conv_module.out_channels
 
-        # Handle ResNet style names (e.g., "layer1_0_conv1")
-        else:
-            # Convert underscore notation to dot notation for ResNet-style models
-            pytorch_name = lucent_layer_name.replace("_", ".")
+    # Handle ResNet style names (e.g., "layer1_0_conv1")
+    else:
+        # Convert underscore notation to dot notation for ResNet-style models
+        pytorch_name = lucent_layer_name.replace("_", ".")
 
-            module = model
-            for part in pytorch_name.split("."):
-                if part.isdigit():
-                    # Handle numeric indices (like layer1.0)
-                    module = module[int(part)]
-                else:
-                    # Handle named attributes
-                    module = getattr(module, part)
+        module = model
+        for part in pytorch_name.split("."):
+            if part.isdigit():
+                # Handle numeric indices (like layer1.0)
+                module = module[int(part)]
+            else:
+                # Handle named attributes
+                module = getattr(module, part)
 
-            # Check if it's a conv layer and get output channels
+        # Check if it's a conv layer and get output channels
+        if hasattr(module, "out_channels"):
+            return module.out_channels
+        elif hasattr(module, "num_features"):  # BatchNorm layers
+            return module.num_features
+
+    # Method 3: Brute force search through all modules
+    # If direct methods fail, search through all named modules
+    for name, module in model.named_modules():
+        if lucent_layer_name in name or name.endswith(lucent_layer_name):
             if hasattr(module, "out_channels"):
                 return module.out_channels
-            elif hasattr(module, "num_features"):  # BatchNorm layers
+            elif hasattr(module, "num_features"):
                 return module.num_features
 
-        # Method 3: Brute force search through all modules
-        # If direct methods fail, search through all named modules
-        for name, module in model.named_modules():
-            if lucent_layer_name in name or name.endswith(lucent_layer_name):
-                if hasattr(module, "out_channels"):
-                    return module.out_channels
-                elif hasattr(module, "num_features"):
-                    return module.num_features
-
-        return None
-
-    except (AttributeError, IndexError, TypeError):
-        return None
+    return None
 
 
 def main():
