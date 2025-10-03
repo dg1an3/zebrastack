@@ -94,7 +94,7 @@ def generate_for_model(model: torch.nn.Module, layers: List[str]) -> None:
     use_objective = "neuron"
     use_objective = "gabor"
 
-    sampled_channels = random.randint(1, 18)
+    sampled_channels = random.randint(1, 4)
 
     logger.info(
         "\nStarting new batch with %s objective, %d channels",
