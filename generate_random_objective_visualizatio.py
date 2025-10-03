@@ -71,13 +71,14 @@ def log_visualization_params(
     logger.info("-" * 40)
 
 
-def main(model, good_layers):
+def main(model, layers):
     use_objective = random.choice(
         ["channel", "neuron", "center_3x3", "center_5x5", "center_7x7"]
     )
     use_objective = "neuron"
+    use_objective = "gabor"
 
-    sampled_channels = random.randint(1, 8)
+    sampled_channels = random.randint(1, 18)
 
     logger.info(
         "\nStarting new batch with %s objective, %d channels",
@@ -86,14 +87,14 @@ def main(model, good_layers):
     )
 
     num_of_points = random.randint(1, 7)
-    layer_name = random.choice(good_layers)
+    layer_name = random.choice(layers)
     height, width, channels = get_layer_dimensions(
         model, layer_name, input_size=GENERATED_IMAGE_SIZE
     )
 
     obj = create_random_objective(
         model,
-        good_layers,
+        layers,
         layer_name=layer_name,
         objective_types=[use_objective] * num_of_points,
         offsets=[

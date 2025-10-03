@@ -5,6 +5,8 @@ from lucent.optvis import objectives
 from lucent.modelzoo import inceptionv1
 from lucent.modelzoo.util import get_model_layers
 
+from gabor_objectives import create_gabor_weighted_objective
+
 
 def get_layer_dimensions(model, layer_name, input_size=224):
     """
@@ -277,9 +279,9 @@ def create_random_objective(
     model,
     layers_list,
     layer_name=None,
+    sampled_channels=2,
     objective_types=["neuron"],
     offsets=[],
-    sampled_channels=2,
 ):
     """Create a random objective with valid channel index, optionally with a second offset objective
 
@@ -309,6 +311,8 @@ def create_random_objective(
         print(f"Could not determine channels for {layer_name}")
         return None
 
+    height, width, channels = get_layer_dimensions(model, layer_name, input_size=384)
+
     objectives_list = []
 
     for n in range(sampled_channels):
@@ -316,7 +320,11 @@ def create_random_objective(
         objectives_list.extend(
             [
                 create_objective_for_layer(
-                    layer_name, objective_type, num_channels, with_offset=(0, 0)
+                    layer_name,
+                    (height, width),
+                    objective_type,
+                    num_channels,
+                    with_offset=(0, 0),
                 )
             ]
         )
@@ -330,6 +338,7 @@ def create_random_objective(
                     [
                         create_objective_for_layer(
                             layer_name,
+                            (height, width),
                             objective_type,
                             num_channels,
                             with_offset=offset,
@@ -341,7 +350,7 @@ def create_random_objective(
 
 
 def create_objective_for_layer(
-    layer_name, objective_type, num_channels, with_offset=(0, 0)
+    layer_name, layer_size, objective_type, num_channels, with_offset=(0, 0)
 ):
     # Pick a random valid channel index (0 to num_channels - 1)
     channel_idx = random.randint(0, num_channels - 1)
@@ -376,6 +385,21 @@ def create_objective_for_layer(
             with_offset=with_offset,
         )
         print(f"✅ Created {size}x{size} offset objective at ({with_offset})")
+    elif objective_type == "gabor":
+        obj = create_gabor_weighted_objective(
+            layer_name,
+            channel_idx,
+            size=layer_size[0],
+            with_offset=with_offset,
+            sigma=(random.uniform(0.5,2.0), random.uniform(0.5,2.0)),
+            theta=random.uniform(0, 3.14),
+            lambda_freq=random.uniform(1.5, 8.0),
+            psi=random.uniform(0, 3.14),
+            gamma=random.uniform(0.5, 1.0),
+            normalize_weights=True,
+        )
+        print(f"✅ Created gabor objective at ({with_offset})")
+
     elif objective_type != "channel":
         raise ValueError("objective type invalid")
 
