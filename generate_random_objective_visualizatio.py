@@ -10,7 +10,8 @@ import torch
 from lucent.optvis import render, param, transform
 from lucent_layer_utils import get_visualizable_layers
 from lucent.modelzoo import inceptionv1, inception_v3, resnet152, resnext101_64x4d
-from parse_model_lucent import create_random_objective, get_layer_dimensions
+from parse_model_lucent import get_layer_dimensions
+from spatial_objectives import create_random_objective
 
 # Setup logging
 LOG_FILENAME = (

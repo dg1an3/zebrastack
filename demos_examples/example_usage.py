@@ -9,9 +9,9 @@ from lucent_layer_utils import (
     get_visualizable_layers,
     categorize_visualizable_layers,
     get_recommended_layers_for_visualization,
-    create_random_objective,
     print_model_summary,
 )
+from spatial_objectives import create_random_objective
 from lucent.modelzoo import inceptionv1, resnet152
 from lucent.optvis import render, param
 
