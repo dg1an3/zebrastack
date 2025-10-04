@@ -1,6 +1,7 @@
-""" _generate_random_objective_visualizations.py
+"""_generate_random_objective_visualizations.py
 Generates and saves random objective visualizations for various CNN models
 """
+
 import datetime
 import os
 import random
@@ -8,9 +9,9 @@ import logging
 from typing import Optional, Dict, Any, List
 import torch
 from lucent.optvis import render, param, transform
-from lucent_layer_utils import get_visualizable_layers
+
 from lucent.modelzoo import inceptionv1, inception_v3, resnet152, resnext101_64x4d
-from parse_model_lucent import get_layer_dimensions
+from lucent_layer_utils import get_visualizable_layers, get_layer_dimensions
 from spatial_objectives import create_random_objective
 
 # Setup logging
@@ -80,6 +81,41 @@ def log_visualization_params(
         logger.info("  Layer info: %s", layer_info)
     logger.info("  Model: %s", type(model).__name__)
     logger.info("-" * 40)
+
+
+def visualize_to_file(
+    model,
+    use_objective,
+    sampled_channels,
+    layer_name,
+    obj,
+    all_transforms,
+    transforms_label,
+    transform_details,
+):
+    filename = generate_filename(
+        use_objective, sampled_channels, transforms_label, layer_name
+    )
+    os.makedirs(os.path.dirname(filename), exist_ok=True)
+    logger.info("Generating %s visualization: %s", transforms_label, filename)
+
+    _ = render.render_vis(
+        model,
+        objective_f=obj,
+        param_f=lambda: param.image(GENERATED_IMAGE_SIZE),
+        transforms=all_transforms,
+        show_image=False,
+        save_image=True,
+        image_name=filename,
+    )
+
+    log_visualization_params(
+        use_objective,
+        sampled_channels,
+        transform_details,
+        filename,
+        transforms_label,
+    )
 
 
 def generate_for_model(model: torch.nn.Module, layers: List[str]) -> None:
@@ -185,32 +221,24 @@ def generate_for_model(model: torch.nn.Module, layers: List[str]) -> None:
         transform.jitter(2),
     ]
 
-    full_transforms_filename = generate_filename(
-        use_objective, sampled_channels, "full_transforms", layer_name
+    transform_details = ", ".join(
+        [
+            "pad(16)",
+            "jitter(8)",
+            "random_scale(0.8-1.2)",
+            "random_rotate(-10 to +10)",
+            "jitter(2)",
+        ]
     )
-    os.makedirs(os.path.dirname(full_transforms_filename), exist_ok=True)
-    logger.info(
-        "Generating full transforms visualization: %s", full_transforms_filename
-    )
-
-    transform_details = "pad(16), jitter(8), random_scale(0.8-1.2), random_rotate(-10 to +10), jitter(2)"
-
-    _ = render.render_vis(
+    visualize_to_file(
         model,
-        objective_f=obj,
-        param_f=lambda: param.image(GENERATED_IMAGE_SIZE),
-        transforms=all_transforms,
-        show_image=False,
-        save_image=True,
-        image_name=full_transforms_filename,
-    )
-
-    log_visualization_params(
         use_objective,
         sampled_channels,
-        transform_details,
-        full_transforms_filename,
+        layer_name,
+        obj,
+        all_transforms,
         "full_transforms",
+        transform_details,
     )
 
     logger.info(
@@ -246,3 +274,5 @@ def main(use_model):
 if __name__ == "__main__":
     models_to_choose = [inceptionv1, inception_v3, resnet152, resnext101_64x4d]
     main(models_to_choose[0])
+
+# %%

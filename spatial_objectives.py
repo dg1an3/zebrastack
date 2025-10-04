@@ -4,7 +4,7 @@ Spatial objective creation functions for Lucent neural network visualization.
 This module provides comprehensive functions to create various types of spatial objectives:
 - Center NxN arrays with offsets
 - Corner, edge, and grid positioning
-- Dual and custom spatial objectives  
+- Dual and custom spatial objectives
 - Random objective generation with multiple types
 
 Separated from parse_model_lucent.py for better code organization.
@@ -12,6 +12,7 @@ Separated from parse_model_lucent.py for better code organization.
 
 import random
 from lucent.optvis import objectives
+from lucent_layer_utils import get_channels_from_lucent_name, get_layer_dimensions
 from gabor_objectives import create_gabor_weighted_objective
 
 
@@ -24,7 +25,6 @@ def create_random_objective(
     offsets=None,
 ):
     """Create a random objective with valid channel index, optionally with a second offset objective
-
     Args:
         model: PyTorch model
         layers_list: List of layer names to choose from
@@ -32,7 +32,6 @@ def create_random_objective(
         objective_types: List of objective types - "channel", "neuron", "center_3x3", "center_5x5", "center_7x7", "gabor"
         sampled_channels: Number of channels to sample
         offsets: List of (x,y) offset tuples for additional objectives
-
     Returns:
         Combined objective or None if failed
     """
@@ -41,9 +40,7 @@ def create_random_objective(
         objective_types = ["neuron"]
     if offsets is None:
         offsets = []
-    # Import here to avoid circular imports
-    from parse_model_lucent import get_channels_from_lucent_name, get_layer_dimensions
-    
+
     assert len(objective_types) == len(offsets) + 1
     objective_type = objective_types[0]
 
@@ -100,14 +97,12 @@ def create_objective_for_layer(
     layer_name, layer_size, objective_type, num_channels, with_offset=(0, 0)
 ):
     """Create a specific type of objective for a layer.
-    
     Args:
         layer_name: Name of the layer
         layer_size: (height, width) tuple of layer spatial dimensions
         objective_type: Type - "channel", "neuron", "center_3x3", "center_5x5", "center_7x7", "gabor"
         num_channels: Number of channels in the layer
         with_offset: (x, y) spatial offset tuple
-        
     Returns:
         Lucent objective
     """
@@ -143,14 +138,14 @@ def create_objective_for_layer(
             with_offset=with_offset,
         )
         print(f"✅ Created {size}x{size} offset objective at ({with_offset})")
-        
+
     elif objective_type == "gabor":
         obj = create_gabor_weighted_objective(
             layer_name,
             channel_idx,
             size=layer_size[0],
             with_offset=with_offset,
-            sigma=(random.uniform(0.5,2.0), random.uniform(0.5,2.0)),
+            sigma=(random.uniform(0.5, 2.0), random.uniform(0.5, 2.0)),
             theta=random.uniform(0, 3.14),
             lambda_freq=random.uniform(1.5, 8.0),
             psi=random.uniform(0, 3.14),
@@ -170,7 +165,6 @@ def create_center_nxn_objective(
 ):
     """
     Create an objective that targets an NxN array of neurons at a specified position in a feature map.
-
     Args:
         layer_name: Name of the layer
         channel_idx: Channel index
@@ -178,7 +172,6 @@ def create_center_nxn_objective(
         spatial_weight: Weight for the spatial averaging (default 1.0)
         with_offset: (x_offset, y_offset) tuple - horizontal and vertical offset from center
                     (positive x = right, negative x = left, positive y = down, negative y = up)
-
     Returns:
         Lucent objective targeting NxN region at specified offset
     """
@@ -222,7 +215,8 @@ def create_center_nxn_objective(
         # Check if the offset region is valid (not entirely out of bounds)
         if h_start >= h or w_start >= w or h_end <= 0 or w_end <= 0:
             print(
-                f"Warning: Offset region ({with_offset[0]}, {with_offset[1]}) is out of bounds for {h}x{w} feature map"
+                f"Warning: Offset region ({with_offset[0]}, {with_offset[1]}) "
+                f"is out of bounds for {h}x{w} feature map"
             )
             # Fallback to center region
             h_start = max(0, center_h - radius)
@@ -243,12 +237,10 @@ def create_center_nxn_objective(
 def create_center_3x3_objective(layer_name, channel_idx, spatial_weight=1.0):
     """
     Backward compatibility wrapper for create_center_nxn_objective with size=3.
-
     Args:
         layer_name: Name of the layer
         channel_idx: Channel index
         spatial_weight: Weight for the spatial averaging (default 1.0)
-
     Returns:
         Lucent objective targeting 3x3 center neurons
     """
@@ -260,12 +252,10 @@ def create_center_3x3_objective(layer_name, channel_idx, spatial_weight=1.0):
 def create_center_5x5_objective(layer_name, channel_idx, spatial_weight=1.0):
     """
     Convenience function for creating 5x5 center objectives.
-
     Args:
         layer_name: Name of the layer
         channel_idx: Channel index
         spatial_weight: Weight for the spatial averaging (default 1.0)
-
     Returns:
         Lucent objective targeting 5x5 center neurons
     """
@@ -277,12 +267,10 @@ def create_center_5x5_objective(layer_name, channel_idx, spatial_weight=1.0):
 def create_center_7x7_objective(layer_name, channel_idx, spatial_weight=1.0):
     """
     Convenience function for creating 7x7 center objectives.
-
     Args:
         layer_name: Name of the layer
         channel_idx: Channel index
         spatial_weight: Weight for the spatial averaging (default 1.0)
-
     Returns:
         Lucent objective targeting 7x7 center neurons
     """
@@ -294,13 +282,11 @@ def create_center_7x7_objective(layer_name, channel_idx, spatial_weight=1.0):
 def create_corner_objectives(layer_name, channel_idx, size=3, spatial_weight=1.0):
     """
     Create objectives for all four corners of a feature map.
-
     Args:
         layer_name: Name of the layer
         channel_idx: Channel index
         size: Size of the region (default 3x3)
         spatial_weight: Weight for the spatial averaging (default 1.0)
-
     Returns:
         Dict with objectives for 'top_left', 'top_right', 'bottom_left', 'bottom_right'
     """
@@ -344,14 +330,12 @@ def create_edge_objectives(
 ):
     """
     Create objectives for the edges (top, bottom, left, right) of a feature map.
-
     Args:
         layer_name: Name of the layer
         channel_idx: Channel index
         size: Size of the region (default 3x3)
         spatial_weight: Weight for the spatial averaging (default 1.0)
         edge_offset: How far from center to place the edge objectives
-
     Returns:
         Dict with objectives for 'top', 'bottom', 'left', 'right'
     """
@@ -376,14 +360,12 @@ def create_grid_objectives(
 ):
     """
     Create a 3x3 grid of objectives across the feature map.
-
     Args:
         layer_name: Name of the layer
         channel_idx: Channel index
         size: Size of each region (default 3x3)
         spatial_weight: Weight for the spatial averaging (default 1.0)
         grid_spacing: Spacing between grid points
-
     Returns:
         Dict with objectives for a 3x3 grid of positions
     """
@@ -410,7 +392,6 @@ def create_grid_objectives(
 def create_dual_objective_presets(model, layers_list, preset="center_vs_corner"):
     """
     Create common dual objective combinations.
-
     Args:
         model: PyTorch model
         layers_list: List of layer names to choose from
@@ -419,7 +400,6 @@ def create_dual_objective_presets(model, layers_list, preset="center_vs_corner")
             - "center_vs_edge": Center 5x5 + edge 3x3
             - "left_vs_right": Left edge 3x3 + right edge 3x3
             - "top_vs_bottom": Top edge 3x3 + bottom edge 3x3
-
     Returns:
         Combined objective or None if failed
     """
@@ -469,13 +449,11 @@ def create_dual_objective_presets(model, layers_list, preset="center_vs_corner")
 def create_custom_spatial_objective(layer_name, channel_idx, positions=None):
     """
     Create an objective that targets specific spatial positions in a feature map.
-
     Args:
         layer_name: Name of the layer
         channel_idx: Channel index
         positions: List of (h, w) tuples for spatial positions to target
                   If None, defaults to center 3x3
-
     Returns:
         Lucent objective targeting specified spatial positions
     """
