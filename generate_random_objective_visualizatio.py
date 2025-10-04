@@ -89,7 +89,7 @@ def visualize_to_file(
     sampled_channels,
     layer_name,
     obj,
-    all_transforms,
+    with_transforms,
     transforms_label,
     transform_details,
 ):
@@ -103,7 +103,7 @@ def visualize_to_file(
         model,
         objective_f=obj,
         param_f=lambda: param.image(GENERATED_IMAGE_SIZE),
-        transforms=all_transforms,
+        transforms=with_transforms,
         show_image=False,
         save_image=True,
         image_name=filename,
@@ -164,23 +164,15 @@ def generate_for_model(model: torch.nn.Module, layers: List[str]) -> None:
 
     if GENERATE_BASE_IMAGE:
         # Base visualization (no transforms)
-        base_filename = generate_filename(
-            use_objective, sampled_channels, "base", layer_name
-        )
-        os.makedirs(os.path.dirname(base_filename), exist_ok=True)
-        logger.info("Generating base visualization: %s", base_filename)
-
-        _ = render.render_vis(
+        visualize_to_file(
             model,
-            objective_f=obj,
-            param_f=lambda: param.image(GENERATED_IMAGE_SIZE),
-            show_image=False,
-            save_image=True,
-            image_name=base_filename,
-        )
-
-        log_visualization_params(
-            use_objective, sampled_channels, None, base_filename, "base"
+            use_objective,
+            sampled_channels,
+            layer_name,
+            obj,
+            None,
+            "base",
+            "base",
         )
 
     # %%
@@ -188,24 +180,16 @@ def generate_for_model(model: torch.nn.Module, layers: List[str]) -> None:
 
     if GENERATE_JITTER_IMAGE:
         jitter_only = [transform.jitter(8)]
-        jitter_filename = generate_filename(
-            use_objective, sampled_channels, "jitter", layer_name
-        )
-        os.makedirs(os.path.dirname(jitter_filename), exist_ok=True)
-        logger.info("Generating jitter visualization: %s", jitter_filename)
 
-        _ = render.render_vis(
+        visualize_to_file(
             model,
+            use_objective,
+            sampled_channels,
+            layer_name,
             obj,
-            transforms=jitter_only,
-            param_f=lambda: param.image(GENERATED_IMAGE_SIZE),
-            show_image=False,
-            save_image=True,
-            image_name=jitter_filename,
-        )
-
-        log_visualization_params(
-            use_objective, sampled_channels, "jitter(8)", jitter_filename, "jitter"
+            jitter_only,
+            "jitter",
+            "jitter(8)",
         )
 
     # %%
