@@ -1,7 +1,7 @@
 import torch
 from lucent.modelzoo import inceptionv1
 from lucent.modelzoo.util import get_model_layers
-from lucent_layer_utils import get_visualizable_layers
+from lucent_layer_utils import get_visualizable_layers, get_channels_from_lucent_name
 
 
 def get_layer_dimensions(model, layer_name, input_size=224):
@@ -62,7 +62,7 @@ def get_layer_dimensions(model, layer_name, input_size=224):
                 print(f"Layer {layer_name} not found in activations")
                 return None
 
-    except Exception as e:
+    except (RuntimeError, ValueError, AttributeError) as e:
         print(f"Error getting dimensions for {layer_name}: {e}")
         return None
 
@@ -82,81 +82,7 @@ def get_module_by_name(model, layer_name):
     return module
 
 
-# Method 2: Helper function specifically for Lucent layer names (underscore notation)
-def get_channels_from_lucent_name(model, lucent_layer_name):
-    """Get number of output channels from a Lucent-style layer name (with underscores)"""
-    # First, try to find the module using the layer name directly
-    # This works with Lucent's layer naming convention
 
-    # Method 1: Direct lookup using Lucent naming
-    # For some models, the layer names from get_model_layers() can be used directly
-    # to access features during forward pass, but not necessarily as module attributes
-
-    # Method 2: Try to find the actual PyTorch module by parsing the name
-    # Different models have different naming conventions
-
-    # Handle Inception V1 style names (e.g., "mixed3a_1x1_pre_relu_conv")
-    if "mixed" in lucent_layer_name:
-        parts = lucent_layer_name.split("_")
-        if len(parts) >= 2:
-            mixed_name = parts[0]  # e.g., "mixed3a"
-            if hasattr(model, mixed_name):
-                mixed_module = getattr(model, mixed_name)
-
-                # Look for the specific branch
-                branch_name = "_".join(parts[1:-2]) if len(parts) > 3 else parts[1]
-                if hasattr(mixed_module, branch_name):
-                    branch_module = getattr(mixed_module, branch_name)
-                    if hasattr(branch_module, "conv") and hasattr(
-                        branch_module.conv, "out_channels"
-                    ):
-                        return branch_module.conv.out_channels
-                    elif hasattr(branch_module, "out_channels"):
-                        return branch_module.out_channels
-
-    # Handle conv2d style names (e.g., "conv2d0_pre_relu_conv")
-    elif "conv2d" in lucent_layer_name:
-        parts = lucent_layer_name.split("_")
-        conv_name = parts[0]  # e.g., "conv2d0"
-        if hasattr(model, conv_name):
-            conv_module = getattr(model, conv_name)
-            if hasattr(conv_module, "conv") and hasattr(
-                conv_module.conv, "out_channels"
-            ):
-                return conv_module.conv.out_channels
-            elif hasattr(conv_module, "out_channels"):
-                return conv_module.out_channels
-
-    # Handle ResNet style names (e.g., "layer1_0_conv1")
-    else:
-        # Convert underscore notation to dot notation for ResNet-style models
-        pytorch_name = lucent_layer_name.replace("_", ".")
-
-        module = model
-        for part in pytorch_name.split("."):
-            if part.isdigit():
-                # Handle numeric indices (like layer1.0)
-                module = module[int(part)]
-            else:
-                # Handle named attributes
-                module = getattr(module, part)
-
-        # Check if it's a conv layer and get output channels
-        if hasattr(module, "out_channels"):
-            return module.out_channels
-        elif hasattr(module, "num_features"):  # BatchNorm layers
-            return module.num_features
-
-    # Method 3: Brute force search through all modules
-    # If direct methods fail, search through all named modules
-    for name, module in model.named_modules():
-        if lucent_layer_name in name or name.endswith(lucent_layer_name):
-            if hasattr(module, "out_channels"):
-                return module.out_channels
-            elif hasattr(module, "num_features"):
-                return module.num_features
-
-    return None
 
 
 def main():
@@ -212,7 +138,7 @@ def main():
                     print(f"  ✅ Successfully created {obj_type} objective!")
                 else:
                     print(f"  ❌ Failed to create {obj_type} objective")
-            except Exception as e:
+            except (RuntimeError, ValueError, AttributeError) as e:
                 print(f"  ❌ Error creating {obj_type} objective: {e}")
 
         # Test direct function calls
@@ -239,7 +165,7 @@ def main():
                     print(f"  ✅ {size_name} center objective created successfully")
                 else:
                     print(f"  ❌ {size_name} center objective creation returned None")
-            except Exception as e:
+            except (RuntimeError, ValueError, AttributeError) as e:
                 print(f"  ❌ {size_name} center objective failed: {e}")
 
     # If no visualizable layers found, let's debug further

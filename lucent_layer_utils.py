@@ -188,12 +188,12 @@ def get_visualizable_layers(model, include_detailed_info=False):
                         if hasattr(module, "stride"):
                             layer_info["stride"] = getattr(module, "stride", None)
 
-                    except Exception:
+                    except (AttributeError, KeyError, TypeError):
                         layer_info["type"] = "Unknown"
 
                     layer_details[layer_name] = layer_info
 
-        except Exception:
+        except (AttributeError, KeyError, TypeError):
             continue
 
     if include_detailed_info:
@@ -318,7 +318,7 @@ def test_layer_for_visualization(model, layer_name, test_channel=0):
         else:
             result["error"] = "Failed to create objective"
 
-    except Exception as e:
+    except (AttributeError, ValueError, TypeError) as e:
         result["error"] = str(e)
 
     return result
@@ -370,7 +370,7 @@ def create_random_objective(model, layers_list=None, max_attempts=50):
                 print(f"   Selected channel: {channel_idx}")
 
                 return obj
-            except Exception as e:
+            except (AttributeError, ValueError, TypeError) as e:
                 print(f"   ✗ Layer {layer_name} failed: {e}")
                 continue
         else:
