@@ -99,8 +99,8 @@ def create_gabor_weighted_objective(
         if weight_sum > 0:
             gabor_weights = gabor_weights / weight_sum
 
-    print(f"Gabor weights shape: {gabor_weights.shape}")
-    print(f"Gabor weight range: [{gabor_weights.min():.3f}, {gabor_weights.max():.3f}]")
+    # print(f"Gabor weights shape: {gabor_weights.shape}")
+    # print(f"Gabor weight range: [{gabor_weights.min():.3f}, {gabor_weights.max():.3f}]")
 
     # Create a custom objective that targets the Gabor-weighted region
     def gabor_weighted_obj(net):
@@ -132,7 +132,8 @@ def create_gabor_weighted_objective(
         # Check if the offset region is valid (not entirely out of bounds)
         if h_start >= h or w_start >= w or h_end <= 0 or w_end <= 0:
             print(
-                f"Warning: Offset region ({with_offset[0]}, {with_offset[1]}) is out of bounds for {h}x{w} feature map"
+                f"Warning: Offset region ({with_offset[0]}, {with_offset[1]}) "
+                f"is out of bounds for {h}x{w} feature map"
             )
             # Fallback to center region
             h_start = max(0, center_h - radius)
