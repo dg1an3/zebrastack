@@ -13,6 +13,7 @@ from lucent.optvis import render, param, transform
 from lucent.modelzoo import inceptionv1, inception_v3, resnet152, resnext101_64x4d
 from lucent_layer_utils import get_visualizable_layers, get_layer_dimensions
 from spatial_objectives import create_random_objective
+from wrapping_transforms import wrap_transform
 
 # Setup logging
 LOG_FILENAME = (
@@ -59,6 +60,7 @@ def generate_filename(
         ]
     )
     if layer_name:
+        layer_name = "\\".join(layer_name.split("_"))
         return f"screen_captures\\{layer_name}\\{base_name}.png"
     return f"screen_captures\\{base_name}.png"
 
@@ -99,6 +101,7 @@ def visualize_to_file(
     os.makedirs(os.path.dirname(filename), exist_ok=True)
     logger.info("Generating %s visualization: %s", transforms_label, filename)
 
+    # TODO: figure out how to morph visualizations to make a "breathing" effect
     _ = render.render_vis(
         model,
         objective_f=obj,
@@ -131,7 +134,7 @@ def generate_for_model(model: torch.nn.Module, layers: List[str]) -> None:
     use_objective = "neuron"
     use_objective = "gabor"
 
-    sampled_channels = random.randint(1, 4)
+    sampled_channels = random.randint(1, 17)
 
     logger.info(
         "\nStarting new batch with %s objective, %d channels",
@@ -139,11 +142,68 @@ def generate_for_model(model: torch.nn.Module, layers: List[str]) -> None:
         sampled_channels,
     )
 
-    num_of_points = random.randint(1, 7)
+    num_of_points = random.randint(1, 2)
     layer_name = random.choice(layers)
-    height, width, _ = get_layer_dimensions(
+    height, width, total_channels = get_layer_dimensions(
         model, layer_name, input_size=GENERATED_IMAGE_SIZE
     )
+
+    # select other layers that have the same height, width as this one
+    matching_layers = [layer_name]
+    for other_layer in random.choices(layers, k=0):
+        if other_layer != layer_name:
+            h, w, _ = get_layer_dimensions(
+                model, other_layer, input_size=GENERATED_IMAGE_SIZE
+            )
+            if h == height and w == width:
+                matching_layers.append(other_layer)
+
+    all_params = []
+    for n in range(num_of_points):
+        # for each objective type (channel, neuron, center_, gabor)
+        # randomly generate parameters
+        #
+        for_layer = random.choice(matching_layers)
+        # generate random channel index (as float)
+        height, width, total_channels = get_layer_dimensions(
+            model, for_layer, input_size=GENERATED_IMAGE_SIZE
+        )
+
+        params = {
+            "objective_type": use_objective,
+            "layer": for_layer,
+            "channel": random.uniform(0.0, total_channels - 1.0),
+        }
+
+        if use_objective in [
+            "neuron",
+            "center_3x3",
+            "center_5x5",
+            "center_7x7",
+            "gabor",
+        ]:
+            # random (x,y) within layer dimensions (default to 0,0)
+            params["offset"] = (
+                (0.0, 0.0)
+                if n == 0
+                else (
+                    random.uniform(-width // 2, width // 2),
+                    random.uniform(-height // 2, height // 2),
+                )
+            )
+
+        if use_objective == "gabor":
+            params = {
+                **params,
+                # random gabor parameters: sigma, lambda, theta, psi, gamma
+                "sigma": (random.uniform(0.5, 3.0), random.uniform(0.5, 3.0)),
+                "lambda": random.uniform(1.0, 5.0),
+                "theta": random.uniform(0.0, 6.28319),  # 0 to 2*pi
+                "psi": random.uniform(0.0, 6.28319),  # 0 to 2*pi
+                "gamma": random.uniform(0.5, 2.0),
+            }
+
+        all_params += [params]
 
     obj = create_random_objective(
         model,
@@ -152,7 +212,7 @@ def generate_for_model(model: torch.nn.Module, layers: List[str]) -> None:
         objective_types=[use_objective] * num_of_points,
         offsets=[
             (
-                random.randint(-width // 4, width // 4),
+                random.randint(-width // 2, width // 2),
                 random.randint(-height // 6, height // 6),
             )
             for _ in range(num_of_points - 1)
@@ -196,7 +256,8 @@ def generate_for_model(model: torch.nn.Module, layers: List[str]) -> None:
     # Adding a whole suite of transforms!
 
     all_transforms = [
-        transform.pad(16),
+        # transform.pad(16),
+        wrap_transform(0.20),
         transform.jitter(8),
         transform.random_scale([n / 100.0 for n in range(80, 120)]),
         transform.random_rotate(
@@ -214,16 +275,17 @@ def generate_for_model(model: torch.nn.Module, layers: List[str]) -> None:
             "jitter(2)",
         ]
     )
-    visualize_to_file(
-        model,
-        use_objective,
-        sampled_channels,
-        layer_name,
-        obj,
-        all_transforms,
-        "full_transforms",
-        transform_details,
-    )
+    for _ in range(3):
+        visualize_to_file(
+            model,
+            use_objective,
+            sampled_channels,
+            layer_name,
+            obj,
+            all_transforms,
+            "full_transforms",
+            transform_details,
+        )
 
     logger.info(
         "Completed batch #%d. Total images generated: %d",

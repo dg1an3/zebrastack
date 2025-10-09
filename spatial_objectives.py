@@ -60,7 +60,7 @@ def create_random_objective(
     objectives_list = []
 
     for n in range(sampled_channels):
-        print(f"Objective {n} of {sampled_channels}")
+        # print(f"Objective {n} of {sampled_channels}")
         objectives_list.extend(
             [
                 create_objective_for_layer(
@@ -109,9 +109,9 @@ def create_objective_for_layer(
     # Pick a random valid channel index (0 to num_channels - 1)
     channel_idx = random.randint(0, num_channels - 1)
 
-    print(f"Selected layer: {layer_name}")
-    print(f"Available channels: 0-{num_channels-1}")
-    print(f"Selected channel: {channel_idx}")
+    # print(f"Selected layer: {layer_name}")
+    # print(f"Available channels: 0-{num_channels-1}")
+    # print(f"Selected channel: {channel_idx}")
 
     # default to channel objective
     obj = objectives.channel(layer_name, channel_idx)
@@ -145,12 +145,13 @@ def create_objective_for_layer(
             channel_idx,
             size=layer_size[0],
             with_offset=with_offset,
-            sigma=(random.uniform(0.5, 2.0), random.uniform(0.5, 2.0)),
+            sigma=(random.uniform(0.5, 8.0), random.uniform(0.5, 8.0)),
             theta=random.uniform(0, 3.14),
-            lambda_freq=random.uniform(1.5, 8.0),
+            lambda_freq=random.uniform(0.5, 6.0),
             psi=random.uniform(0, 3.14),
-            gamma=random.uniform(0.5, 1.0),
+            gamma=random.uniform(0.5, 2.0),
             normalize_weights=True,
+            spatial_weight=random.normalvariate(0.0, 1.0),
         )
         print(f"✅ Created gabor objective at ({with_offset})")
 
@@ -445,56 +446,3 @@ def create_dual_objective_presets(model, layers_list, preset="center_vs_corner")
         sampled_channels=1,  # Use 1 channel for cleaner dual objectives
     )
 
-
-def create_custom_spatial_objective(layer_name, channel_idx, positions=None):
-    """
-    Create an objective that targets specific spatial positions in a feature map.
-    Args:
-        layer_name: Name of the layer
-        channel_idx: Channel index
-        positions: List of (h, w) tuples for spatial positions to target
-                  If None, defaults to center 3x3
-    Returns:
-        Lucent objective targeting specified spatial positions
-    """
-    if positions is None:
-        # Default to 3x3 center positions
-        positions = [
-            (-1, -1),
-            (-1, 0),
-            (-1, 1),
-            (0, -1),
-            (0, 0),
-            (0, 1),
-            (1, -1),
-            (1, 0),
-            (1, 1),
-        ]
-
-    def spatial_objective(model):
-        layer_acts = model(layer_name)
-
-        if len(layer_acts.shape) != 4:
-            return -layer_acts[:, channel_idx].mean()
-
-        _, _, h, w = layer_acts.shape
-        center_h, center_w = h // 2, w // 2
-
-        total_activation = 0
-        valid_positions = 0
-
-        for rel_h, rel_w in positions:
-            abs_h = center_h + rel_h
-            abs_w = center_w + rel_w
-
-            # Check bounds
-            if 0 <= abs_h < h and 0 <= abs_w < w:
-                total_activation += layer_acts[:, channel_idx, abs_h, abs_w]
-                valid_positions += 1
-
-        if valid_positions > 0:
-            return -total_activation / valid_positions
-        else:
-            return -layer_acts[:, channel_idx].mean()
-
-    return objectives.Objective(spatial_objective)
