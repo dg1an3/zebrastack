@@ -134,7 +134,7 @@ def generate_for_model(model: torch.nn.Module, layers: List[str]) -> None:
     use_objective = "neuron"
     use_objective = "gabor"
 
-    sampled_channels = random.randint(1, 17)
+    sampled_channels = random.randint(1, 11)
 
     logger.info(
         "\nStarting new batch with %s objective, %d channels",
@@ -142,20 +142,22 @@ def generate_for_model(model: torch.nn.Module, layers: List[str]) -> None:
         sampled_channels,
     )
 
-    num_of_points = random.randint(1, 2)
+    num_of_points = random.randint(1, 8)
     layer_name = random.choice(layers)
     height, width, total_channels = get_layer_dimensions(
         model, layer_name, input_size=GENERATED_IMAGE_SIZE
     )
+    print(f"Selected layer: {layer_name} ({height}x{width}x{total_channels})")
 
     # select other layers that have the same height, width as this one
     matching_layers = [layer_name]
-    for other_layer in random.choices(layers, k=0):
+    for other_layer in random.choices(layers, k=10):
         if other_layer != layer_name:
-            h, w, _ = get_layer_dimensions(
+            h, w, other_channels = get_layer_dimensions(
                 model, other_layer, input_size=GENERATED_IMAGE_SIZE
             )
             if h == height and w == width:
+                print(f"  Matching layer: {other_layer} ({h}x{w}x{other_channels})")
                 matching_layers.append(other_layer)
 
     all_params = []

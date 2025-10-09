@@ -74,9 +74,9 @@ def create_gabor_weighted_objective(
 
     # Ensure size is odd for symmetric centering
     if size % 2 == 0:
-        print(
-            f"Warning: Even size {size} provided, using {size+1} for symmetric centering"
-        )
+        # print(
+        #     f"Warning: Even size {size} provided, using {size+1} for symmetric centering"
+        # )
         size += 1
 
     # Calculate the radius (how many pixels from center)

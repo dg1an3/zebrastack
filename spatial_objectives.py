@@ -61,34 +61,36 @@ def create_random_objective(
 
     for n in range(sampled_channels):
         # print(f"Objective {n} of {sampled_channels}")
-        objectives_list.extend(
-            [
-                create_objective_for_layer(
-                    layer_name,
-                    (height, width),
-                    objective_type,
-                    num_channels,
-                    with_offset=(0, 0),
-                )
-            ]
+        obj = create_objective_for_layer(
+            layer_name,
+            (height, width),
+            objective_type,
+            num_channels,
+            with_offset=(0, 0),
         )
+
+        if isinstance(obj, list):
+            objectives_list.extend(obj)
+        else:
+            objectives_list.extend([obj])
 
     for objective_type, offset in zip(objective_types[1:], offsets):
         # Add second objective with offset if specified
         if objective_type is not None:
             for n in range(sampled_channels):
                 print(f"Objective {n} of {sampled_channels}")
-                objectives_list.extend(
-                    [
-                        create_objective_for_layer(
-                            layer_name,
-                            (height, width),
-                            objective_type,
-                            num_channels,
-                            with_offset=offset,
-                        )
-                    ]
+                obj = create_objective_for_layer(
+                    layer_name,
+                    (height, width),
+                    objective_type,
+                    num_channels,
+                    with_offset=offset,
                 )
+
+                if isinstance(obj, list):
+                    objectives_list.extend(obj)
+                else:
+                    objectives_list.extend([obj])
 
     return sum(objectives_list)
 
@@ -140,20 +142,62 @@ def create_objective_for_layer(
         print(f"✅ Created {size}x{size} offset objective at ({with_offset})")
 
     elif objective_type == "gabor":
-        obj = create_gabor_weighted_objective(
-            layer_name,
-            channel_idx,
-            size=layer_size[0],
-            with_offset=with_offset,
-            sigma=(random.uniform(0.5, 8.0), random.uniform(0.5, 8.0)),
-            theta=random.uniform(0, 3.14),
-            lambda_freq=random.uniform(0.5, 6.0),
-            psi=random.uniform(0, 3.14),
-            gamma=random.uniform(0.5, 2.0),
-            normalize_weights=True,
-            spatial_weight=random.normalvariate(0.0, 1.0),
-        )
-        print(f"✅ Created gabor objective at ({with_offset})")
+        center_weight = random.normalvariate(0.0, 1.0)
+        sigma = (random.uniform(0.5, 8.0), random.uniform(0.5, 8.0))
+        sigma_delta = (random.uniform(-1.0, 1.0), random.uniform(-1.0, 1.0))
+        theta = random.uniform(0, 3.14)
+        theta_delta = random.uniform(-0.3, 0.3)
+        lambda_freq = random.uniform(0.5, 6.0)
+        lambda_delta = random.uniform(-0.2, 0.2)
+        psi = random.uniform(0, 3.14)
+        psi_delta = random.uniform(-0.3, 0.3)
+        gamma = random.uniform(0.5, 2.0)
+        gamma_delta = random.uniform(-0.3, 0.3)
+        # TODO: pass these as argv**
+        # TODO: randomly vary these by small amounts
+        obj = [
+            create_gabor_weighted_objective(
+                layer_name,
+                max(channel_idx - 1, 0),
+                size=layer_size[0],
+                with_offset=with_offset,
+                sigma=(sigma[0] - sigma_delta[0], sigma[1] - sigma_delta[1]),
+                theta=theta - theta_delta,
+                lambda_freq=lambda_freq - lambda_delta,
+                psi=psi - psi_delta,
+                gamma=gamma - gamma_delta,
+                normalize_weights=True,
+                spatial_weight=center_weight / 4.0,
+            ),
+            create_gabor_weighted_objective(
+                layer_name,
+                channel_idx,
+                size=layer_size[0],
+                with_offset=with_offset,
+                sigma=sigma,
+                theta=theta,
+                lambda_freq=lambda_freq,
+                psi=psi,
+                gamma=gamma,
+                normalize_weights=True,
+                spatial_weight=center_weight / 2.0,
+            ),
+            create_gabor_weighted_objective(
+                layer_name,
+                min(channel_idx + 1, num_channels - 1),
+                size=layer_size[0],
+                with_offset=with_offset,
+                sigma=(sigma[0] + sigma_delta[0], sigma[1] + sigma_delta[1]),
+                theta=theta + theta_delta,
+                lambda_freq=lambda_freq + lambda_delta,
+                psi=psi + psi_delta,
+                gamma=gamma + gamma_delta,
+                normalize_weights=True,
+                spatial_weight=center_weight / 4.0,
+            ),
+        ]
+
+        # print(f"✅ Created gabor objective at ({with_offset})")
 
     elif objective_type != "channel":
         raise ValueError(f"Invalid objective type: {objective_type}")
@@ -445,4 +489,3 @@ def create_dual_objective_presets(model, layers_list, preset="center_vs_corner")
         offsets=[(config["x_offset"], config["y_offset"])],
         sampled_channels=1,  # Use 1 channel for cleaner dual objectives
     )
-
