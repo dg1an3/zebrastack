@@ -145,15 +145,15 @@ def create_objective_for_layer(
     elif objective_type == "gabor":
         center_weight = random.normalvariate(0.0, 1.0)
         sigma = (random.uniform(0.5, 8.0), random.uniform(0.5, 8.0))
-        sigma_delta = (random.uniform(-0.3, 0.3), random.uniform(-0.3, 0.3))
+        sigma_delta = (random.uniform(-0.1, 0.1), random.uniform(-0.1, 0.1))
         theta = random.uniform(0, 3.14)
-        theta_delta = random.uniform(-0.2, 0.2)
+        theta_delta = random.uniform(-0.1, 0.1)
         log_10_lambda_freq = random.uniform(-0.3, 0.8)  # log10(0.5), log10(6.0)
-        log_10_lambda_delta = random.uniform(0.3, 0.3)
+        log_10_lambda_delta = random.uniform(-0.2, 0.2)
         psi = random.uniform(0, 3.14)
-        psi_delta = random.uniform(-0.3, 0.3)
+        psi_delta = random.uniform(-0.1, 0.2)
         log_10_gamma = random.uniform(-0.3, log10(2.0)) # log10(0.5), log10(2.0)
-        log_10_gamma_delta = random.uniform(-0.4, 0.4)
+        log_10_gamma_delta = random.uniform(-0.2, 0.2)
         # TODO: pass these as argv**
         # TODO: randomly vary these by small amounts
         obj = [

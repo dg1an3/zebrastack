@@ -134,7 +134,7 @@ def generate_for_model(model: torch.nn.Module, layers: List[str]) -> None:
     use_objective = "neuron"
     use_objective = "gabor"
 
-    sampled_channels = random.randint(1, 11)
+    sampled_channels = 0 # random.randint(1, 11)
 
     logger.info(
         "\nStarting new batch with %s objective, %d channels",
@@ -142,7 +142,7 @@ def generate_for_model(model: torch.nn.Module, layers: List[str]) -> None:
         sampled_channels,
     )
 
-    num_of_points = random.randint(1, 8)
+    num_of_points = random.randint(1, 4)
     layer_name = random.choice(layers)
     height, width, total_channels = get_layer_dimensions(
         model, layer_name, input_size=GENERATED_IMAGE_SIZE
@@ -207,6 +207,7 @@ def generate_for_model(model: torch.nn.Module, layers: List[str]) -> None:
 
         all_params += [params]
 
+    sampled_channels = random.randint(1, 4)
     obj = create_random_objective(
         model,
         layers,
