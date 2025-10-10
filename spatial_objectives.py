@@ -11,10 +11,26 @@ Separated from parse_model_lucent.py for better code organization.
 """
 
 import random
+import datetime
+import logging
 from lucent.optvis import objectives
 from numpy import log10
 from lucent_layer_utils import get_channels_from_lucent_name, get_layer_dimensions
 from gabor_objectives import create_gabor_weighted_objective
+
+# Setup logging
+LOG_FILENAME = (
+    f"visualization_log_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.FileHandler(LOG_FILENAME),
+        logging.StreamHandler(),  # Also print to console
+    ],
+)
+logger = logging.getLogger(__name__)
 
 
 def create_random_objective(
@@ -112,9 +128,9 @@ def create_objective_for_layer(
     # Pick a random valid channel index (0 to num_channels - 1)
     channel_idx = random.randint(0, num_channels - 1)
 
-    # print(f"Selected layer: {layer_name}")
-    # print(f"Available channels: 0-{num_channels-1}")
-    # print(f"Selected channel: {channel_idx}")
+    logger.info(f"Selected layer: {layer_name}")
+    logger.info(f"Available channels: 0-{num_channels-1}")
+    logger.info(f"Selected channel: {channel_idx}")
 
     # default to channel objective
     obj = objectives.channel(layer_name, channel_idx)
@@ -149,11 +165,19 @@ def create_objective_for_layer(
         theta = random.uniform(0, 3.14)
         theta_delta = random.uniform(-0.1, 0.1)
         log_10_lambda_freq = random.uniform(-0.3, 0.8)  # log10(0.5), log10(6.0)
-        log_10_lambda_delta = random.uniform(-0.2, 0.2)
+        log_10_lambda_delta = random.uniform(-0.6, 0.6)
         psi = random.uniform(0, 3.14)
         psi_delta = random.uniform(-0.1, 0.2)
-        log_10_gamma = random.uniform(-0.3, log10(2.0)) # log10(0.5), log10(2.0)
+        log_10_gamma = random.uniform(-0.3, log10(2.0))  # log10(0.5), log10(2.0)
         log_10_gamma_delta = random.uniform(-0.2, 0.2)
+
+        logger.info(
+            "Gabor params: sigma=%s, theta=%s, lambda_freq=%s, psi=%s, gamma=%s",
+            sigma, theta, 10**log_10_lambda_freq, psi, 10**log_10_gamma
+        )
+        logger.info(
+            "           deltas: sigma=%s, theta=%s, lambda=%s, psi=%s, gamma=%s",
+            sigma_delta, theta_delta, 10**log_10_lambda_delta, psi_delta, 10**log_10_gamma_delta)
         # TODO: pass these as argv**
         # TODO: randomly vary these by small amounts
         obj = [
@@ -162,14 +186,17 @@ def create_objective_for_layer(
                 max(channel_idx - 2, 0),
                 size=layer_size[0],
                 with_offset=with_offset,
-                sigma=(sigma[0] - 2.0 * sigma_delta[0], sigma[1] - 2.0 * sigma_delta[1]),
+                sigma=(
+                    sigma[0] - 2.0 * sigma_delta[0],
+                    sigma[1] - 2.0 * sigma_delta[1],
+                ),
                 theta=theta - theta_delta,
                 lambda_freq=10 ** (log_10_lambda_freq - 2.0 * log_10_lambda_delta),
                 psi=psi - 2.0 * psi_delta,
                 gamma=10 ** (log_10_gamma - 2.0 * log_10_gamma_delta),
                 normalize_weights=True,
                 spatial_weight=center_weight / 8.0,
-            ),            
+            ),
             create_gabor_weighted_objective(
                 layer_name,
                 max(channel_idx - 1, 0),
@@ -190,9 +217,9 @@ def create_objective_for_layer(
                 with_offset=with_offset,
                 sigma=sigma,
                 theta=theta,
-                lambda_freq=10 ** log_10_lambda_freq,
+                lambda_freq=10**log_10_lambda_freq,
                 psi=psi,
-                gamma=10 ** log_10_gamma,
+                gamma=10**log_10_gamma,
                 normalize_weights=True,
                 spatial_weight=center_weight / 2.0,
             ),
@@ -214,17 +241,20 @@ def create_objective_for_layer(
                 min(channel_idx + 2, num_channels - 1),
                 size=layer_size[0],
                 with_offset=with_offset,
-                sigma=(sigma[0] + 2.0 * sigma_delta[0], sigma[1] + 2.0 * sigma_delta[1]),
+                sigma=(
+                    sigma[0] + 2.0 * sigma_delta[0],
+                    sigma[1] + 2.0 * sigma_delta[1],
+                ),
                 theta=theta + theta_delta,
                 lambda_freq=10 ** (log_10_lambda_freq + 2.0 * log_10_lambda_delta),
                 psi=psi + 2.0 * psi_delta,
                 gamma=10 ** (log_10_gamma + 2.0 * log_10_gamma_delta),
                 normalize_weights=True,
                 spatial_weight=center_weight / 8.0,
-            ),            
+            ),
         ]
 
-        # print(f"✅ Created gabor objective at ({with_offset})")
+        logger.info("[X] Created gabor objective at (%s)", with_offset)
 
     elif objective_type != "channel":
         raise ValueError(f"Invalid objective type: {objective_type}")
