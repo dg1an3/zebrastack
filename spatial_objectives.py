@@ -12,6 +12,7 @@ Separated from parse_model_lucent.py for better code organization.
 
 import random
 from lucent.optvis import objectives
+from numpy import log10
 from lucent_layer_utils import get_channels_from_lucent_name, get_layer_dimensions
 from gabor_objectives import create_gabor_weighted_objective
 
@@ -144,18 +145,31 @@ def create_objective_for_layer(
     elif objective_type == "gabor":
         center_weight = random.normalvariate(0.0, 1.0)
         sigma = (random.uniform(0.5, 8.0), random.uniform(0.5, 8.0))
-        sigma_delta = (random.uniform(-1.0, 1.0), random.uniform(-1.0, 1.0))
+        sigma_delta = (random.uniform(-0.3, 0.3), random.uniform(-0.3, 0.3))
         theta = random.uniform(0, 3.14)
-        theta_delta = random.uniform(-0.3, 0.3)
-        lambda_freq = random.uniform(0.5, 6.0)
-        lambda_delta = random.uniform(-0.2, 0.2)
+        theta_delta = random.uniform(-0.2, 0.2)
+        log_10_lambda_freq = random.uniform(-0.3, 0.8)  # log10(0.5), log10(6.0)
+        log_10_lambda_delta = random.uniform(0.3, 0.3)
         psi = random.uniform(0, 3.14)
         psi_delta = random.uniform(-0.3, 0.3)
-        gamma = random.uniform(0.5, 2.0)
-        gamma_delta = random.uniform(-0.3, 0.3)
+        log_10_gamma = random.uniform(-0.3, log10(2.0)) # log10(0.5), log10(2.0)
+        log_10_gamma_delta = random.uniform(-0.4, 0.4)
         # TODO: pass these as argv**
         # TODO: randomly vary these by small amounts
         obj = [
+            create_gabor_weighted_objective(
+                layer_name,
+                max(channel_idx - 2, 0),
+                size=layer_size[0],
+                with_offset=with_offset,
+                sigma=(sigma[0] - 2.0 * sigma_delta[0], sigma[1] - 2.0 * sigma_delta[1]),
+                theta=theta - theta_delta,
+                lambda_freq=10 ** (log_10_lambda_freq - 2.0 * log_10_lambda_delta),
+                psi=psi - 2.0 * psi_delta,
+                gamma=10 ** (log_10_gamma - 2.0 * log_10_gamma_delta),
+                normalize_weights=True,
+                spatial_weight=center_weight / 8.0,
+            ),            
             create_gabor_weighted_objective(
                 layer_name,
                 max(channel_idx - 1, 0),
@@ -163,9 +177,9 @@ def create_objective_for_layer(
                 with_offset=with_offset,
                 sigma=(sigma[0] - sigma_delta[0], sigma[1] - sigma_delta[1]),
                 theta=theta - theta_delta,
-                lambda_freq=lambda_freq - lambda_delta,
+                lambda_freq=10 ** (log_10_lambda_freq - log_10_lambda_delta),
                 psi=psi - psi_delta,
-                gamma=gamma - gamma_delta,
+                gamma=10 ** (log_10_gamma - log_10_gamma_delta),
                 normalize_weights=True,
                 spatial_weight=center_weight / 4.0,
             ),
@@ -176,9 +190,9 @@ def create_objective_for_layer(
                 with_offset=with_offset,
                 sigma=sigma,
                 theta=theta,
-                lambda_freq=lambda_freq,
+                lambda_freq=10 ** log_10_lambda_freq,
                 psi=psi,
-                gamma=gamma,
+                gamma=10 ** log_10_gamma,
                 normalize_weights=True,
                 spatial_weight=center_weight / 2.0,
             ),
@@ -189,12 +203,25 @@ def create_objective_for_layer(
                 with_offset=with_offset,
                 sigma=(sigma[0] + sigma_delta[0], sigma[1] + sigma_delta[1]),
                 theta=theta + theta_delta,
-                lambda_freq=lambda_freq + lambda_delta,
+                lambda_freq=10 ** (log_10_lambda_freq + log_10_lambda_delta),
                 psi=psi + psi_delta,
-                gamma=gamma + gamma_delta,
+                gamma=10 ** (log_10_gamma + log_10_gamma_delta),
                 normalize_weights=True,
                 spatial_weight=center_weight / 4.0,
             ),
+            create_gabor_weighted_objective(
+                layer_name,
+                min(channel_idx + 2, num_channels - 1),
+                size=layer_size[0],
+                with_offset=with_offset,
+                sigma=(sigma[0] + 2.0 * sigma_delta[0], sigma[1] + 2.0 * sigma_delta[1]),
+                theta=theta + theta_delta,
+                lambda_freq=10 ** (log_10_lambda_freq + 2.0 * log_10_lambda_delta),
+                psi=psi + 2.0 * psi_delta,
+                gamma=10 ** (log_10_gamma + 2.0 * log_10_gamma_delta),
+                normalize_weights=True,
+                spatial_weight=center_weight / 8.0,
+            ),            
         ]
 
         # print(f"✅ Created gabor objective at ({with_offset})")
