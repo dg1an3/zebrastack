@@ -17,7 +17,7 @@ from wrapping_transforms import wrap_transform
 
 # Setup logging
 LOG_FILENAME = (
-    f"visualization_log_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+    f"logs\\visualization_log_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
 )
 logging.basicConfig(
     level=logging.INFO,

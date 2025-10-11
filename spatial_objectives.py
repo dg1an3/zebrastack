@@ -20,7 +20,7 @@ from gabor_objectives import create_gabor_weighted_objective
 
 # Setup logging
 LOG_FILENAME = (
-    f"visualization_log_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+    f"logs\\visualization_log_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
 )
 logging.basicConfig(
     level=logging.INFO,

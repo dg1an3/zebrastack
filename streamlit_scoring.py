@@ -9,20 +9,63 @@ from PIL import Image
 st.set_page_config(page_title="Image Selection App", layout="wide")
 
 
+# Function to recursively find all valid folders with images
+def find_valid_folders(base_path, excluded_folders):
+    valid_folders = []
+    
+    def scan_directory(path):
+        try:
+            for item in os.scandir(path):
+                if item.is_dir():
+                    folder_name = item.name
+                    # Skip excluded folders entirely (don't recurse into them)
+                    if folder_name not in excluded_folders:
+                        # Check if this folder has images
+                        try:
+                            images = [
+                                f for f in os.listdir(item.path)
+                                if f.lower().endswith(("png", "jpg", "jpeg"))
+                            ]
+                            if len(images) >= 3:
+                                valid_folders.append(item.path)
+                        except (PermissionError, OSError):
+                            pass  # Skip folders we can't access
+                        
+                        # Recursively scan subfolders
+                        scan_directory(item.path)
+        except (PermissionError, OSError):
+            pass  # Skip directories we can't access
+    
+    scan_directory(base_path)
+    return valid_folders
+
 # Function to randomly select a folder and three images
 def select_images(base_path):
-    folders = [f.path for f in os.scandir(base_path) if f.is_dir()]
+    # Folders to exclude from selection
+    excluded_folders = {
+        "conv2d0",
+        "conv2d1",
+        "conv2d2",
+    }
+    
+    # Find all valid folders recursively
+    folders = find_valid_folders(base_path, excluded_folders)
+
     if not folders:
-        st.error("No folders found in the specified directory.")
+        st.error("No folders with sufficient images found in the specified directory.")
         return None, None
 
     selected_folder = random.choice(folders)
+
+    # display the selected folder
+    st.write(f"Selected Folder: {selected_folder}")
+
     images = [
         f
         for f in os.listdir(selected_folder)
         if f.lower().endswith(("png", "jpg", "jpeg"))
     ]
-    if len(images) < 3:        
+    if len(images) < 3:
         # st.error(f"Not enough images in folder: {selected_folder}")
         # return None, None
         # Instead of erroring out, just try another folder
@@ -42,7 +85,9 @@ def save_selection(folder, images, selected_image):
         "selected_image": selected_image,
     }
     # Create unique filename with timestamp to avoid overwriting
-    timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]  # microseconds to milliseconds
+    timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[
+        :-3
+    ]  # microseconds to milliseconds
     yaml_file = os.path.join(folder, f"selection_{timestamp_str}.yaml")
     with open(yaml_file, "w") as file:
         yaml.dump(data, file)
@@ -55,9 +100,9 @@ st.title("Image Selection App")
 image_width = st.slider("Image Width", min_value=150, max_value=600, value=300, step=25)
 
 # st.text_input("Enter the base directory path:", value=".")
-base_path = "screen_captures" 
+base_path = "screen_captures"
 
-if True: # st.button("Select Images"):
+if True:  # st.button("Select Images"):
     folder, images = select_images(base_path)
     if folder and images:
         st.session_state["folder"] = folder
@@ -77,7 +122,7 @@ if "images" in st.session_state:
                 st.session_state["selected_image"] = images[i]
                 save_selection(folder, images, images[i])
                 st.success(f"You selected Image {i+1}. Selection saved!")
-                
+
                 # Automatically generate new random path and select three new images
                 new_folder, new_images = select_images(base_path)
                 if new_folder and new_images:
