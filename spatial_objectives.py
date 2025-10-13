@@ -160,8 +160,14 @@ def create_objective_for_layer(
 
     elif objective_type == "gabor":
         center_weight = random.normalvariate(0.0, 1.0)
-        sigma = (random.uniform(0.5, 8.0), random.uniform(0.5, 8.0))
-        sigma_delta = (random.uniform(-0.1, 0.1), random.uniform(-0.1, 0.1))
+        log_10_sigma = (
+            random.uniform(log10(0.5), log10(8.0)),
+            random.uniform(log10(0.5), log10(8.0)),
+        )
+        log_10_sigma_delta = (
+            random.uniform(-log10(0.1), log10(0.1)),
+            random.uniform(-log10(0.1), log10(0.1)),
+        )
         theta = random.uniform(0, 3.14)
         theta_delta = random.uniform(-0.1, 0.1)
         log_10_lambda_freq = random.uniform(-0.3, 0.8)  # log10(0.5), log10(6.0)
@@ -173,11 +179,20 @@ def create_objective_for_layer(
 
         logger.info(
             "Gabor params: sigma=%s, theta=%s, lambda_freq=%s, psi=%s, gamma=%s",
-            sigma, theta, 10**log_10_lambda_freq, psi, 10**log_10_gamma
+            (10 ** log_10_sigma[0], 10 ** log_10_sigma[1]),
+            theta,
+            10**log_10_lambda_freq,
+            psi,
+            10**log_10_gamma,
         )
         logger.info(
             "           deltas: sigma=%s, theta=%s, lambda=%s, psi=%s, gamma=%s",
-            sigma_delta, theta_delta, 10**log_10_lambda_delta, psi_delta, 10**log_10_gamma_delta)
+            (10 ** log_10_sigma_delta[0], 10 ** log_10_sigma_delta[1]),
+            theta_delta,
+            10**log_10_lambda_delta,
+            psi_delta,
+            10**log_10_gamma_delta,
+        )
         # TODO: pass these as argv**
         # TODO: randomly vary these by small amounts
         obj = [
@@ -187,8 +202,8 @@ def create_objective_for_layer(
                 size=layer_size[0],
                 with_offset=with_offset,
                 sigma=(
-                    sigma[0] - 2.0 * sigma_delta[0],
-                    sigma[1] - 2.0 * sigma_delta[1],
+                    10 ** log_10_sigma[0] - 2.0 * 10 ** log_10_sigma_delta[0],
+                    10 ** log_10_sigma[1] - 2.0 * 10 ** log_10_sigma_delta[1],
                 ),
                 theta=theta - theta_delta,
                 lambda_freq=10 ** (log_10_lambda_freq - 2.0 * log_10_lambda_delta),
@@ -202,7 +217,10 @@ def create_objective_for_layer(
                 max(channel_idx - 1, 0),
                 size=layer_size[0],
                 with_offset=with_offset,
-                sigma=(sigma[0] - sigma_delta[0], sigma[1] - sigma_delta[1]),
+                sigma=(
+                    10 ** log_10_sigma[0] - 10 ** log_10_sigma_delta[0],
+                    10 ** log_10_sigma[1] - 10 ** log_10_sigma_delta[1],
+                ),
                 theta=theta - theta_delta,
                 lambda_freq=10 ** (log_10_lambda_freq - log_10_lambda_delta),
                 psi=psi - psi_delta,
@@ -215,7 +233,7 @@ def create_objective_for_layer(
                 channel_idx,
                 size=layer_size[0],
                 with_offset=with_offset,
-                sigma=sigma,
+                sigma=(10 ** log_10_sigma[0], 10 ** log_10_sigma[1]),
                 theta=theta,
                 lambda_freq=10**log_10_lambda_freq,
                 psi=psi,
@@ -228,7 +246,10 @@ def create_objective_for_layer(
                 min(channel_idx + 1, num_channels - 1),
                 size=layer_size[0],
                 with_offset=with_offset,
-                sigma=(sigma[0] + sigma_delta[0], sigma[1] + sigma_delta[1]),
+                sigma=(
+                    10 ** log_10_sigma[0] + 10 ** log_10_sigma_delta[0],
+                    10 ** log_10_sigma[1] + 10 ** log_10_sigma_delta[1],
+                ),
                 theta=theta + theta_delta,
                 lambda_freq=10 ** (log_10_lambda_freq + log_10_lambda_delta),
                 psi=psi + psi_delta,
@@ -242,8 +263,8 @@ def create_objective_for_layer(
                 size=layer_size[0],
                 with_offset=with_offset,
                 sigma=(
-                    sigma[0] + 2.0 * sigma_delta[0],
-                    sigma[1] + 2.0 * sigma_delta[1],
+                    10 ** log_10_sigma[0] + 2.0 * 10 ** log_10_sigma_delta[0],
+                    10 ** log_10_sigma[1] + 2.0 * 10 ** log_10_sigma_delta[1],
                 ),
                 theta=theta + theta_delta,
                 lambda_freq=10 ** (log_10_lambda_freq + 2.0 * log_10_lambda_delta),
