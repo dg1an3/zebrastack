@@ -6,6 +6,7 @@ import datetime
 import os
 import random
 import logging
+import yaml
 from typing import Optional, Dict, Any, List
 import torch
 from lucent.optvis import render, param, transform
@@ -85,6 +86,45 @@ def log_visualization_params(
     logger.info("-" * 40)
 
 
+def save_visualization_params_to_yaml(
+    objective_type: str,
+    sampled_channels: int,
+    layer_info: Optional[Dict[str, Any]],
+    image_filename: str,
+    model: torch.nn.Module,
+    transform_type: str = "base",
+    transform_details: Optional[str] = None,
+    all_params: Optional[List[Dict[str, Any]]] = None,
+) -> None:
+    """Save visualization parameters to a YAML file alongside the image"""
+    # Create YAML filename by replacing .png with .yaml
+    yaml_filename = image_filename.replace('.png', '.yaml')
+    
+    # Prepare data structure matching the log format
+    visualization_data = {
+        'visualization_info': {
+            'image_number': image_counter,
+            'image_filename': image_filename,
+            'objective_type': objective_type,
+            'sampled_channels': sampled_channels,
+            'transform_type': transform_type,
+            'model_name': type(model).__name__,
+            'generation_timestamp': datetime.datetime.now().isoformat(),
+        },
+        'layer_info': layer_info if layer_info else {},
+        'transform_details': transform_details if transform_details else transform_type,
+        'objective_parameters': all_params if all_params else [],
+    }
+    
+    # Save to YAML file
+    try:
+        with open(yaml_filename, 'w') as yaml_file:
+            yaml.dump(visualization_data, yaml_file, default_flow_style=False, indent=2)
+        logger.info("  YAML saved: %s", yaml_filename)
+    except Exception as e:
+        logger.error("Failed to save YAML file %s: %s", yaml_filename, e)
+
+
 def visualize_to_file(
     model,
     use_objective,
@@ -94,6 +134,7 @@ def visualize_to_file(
     with_transforms,
     transforms_label,
     transform_details,
+    all_params=None,
 ):
     filename = generate_filename(
         use_objective, sampled_channels, transforms_label, layer_name
@@ -112,13 +153,28 @@ def visualize_to_file(
         image_name=filename,
     )
 
+    # Log to console/file
     log_visualization_params(
         use_objective,
         sampled_channels,
         transform_details,
         filename,
+        model,
         transforms_label,
     )
+    
+    # Save parameters to YAML file
+    save_visualization_params_to_yaml(
+        use_objective,
+        sampled_channels,
+        transform_details,
+        filename,
+        model,
+        transforms_label,
+        transform_details,
+        all_params,
+    )
+
 
 
 def generate_for_model(model: torch.nn.Module, layers: List[str]) -> None:
@@ -236,6 +292,7 @@ def generate_for_model(model: torch.nn.Module, layers: List[str]) -> None:
             None,
             "base",
             "base",
+            all_params,
         )
 
     # %%
@@ -253,6 +310,7 @@ def generate_for_model(model: torch.nn.Module, layers: List[str]) -> None:
             jitter_only,
             "jitter",
             "jitter(8)",
+            all_params,
         )
 
     # %%
@@ -288,6 +346,7 @@ def generate_for_model(model: torch.nn.Module, layers: List[str]) -> None:
             all_transforms,
             "full_transforms",
             transform_details,
+            all_params,
         )
 
     logger.info(
