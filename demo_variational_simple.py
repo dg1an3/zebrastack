@@ -20,12 +20,12 @@ def simple_variational_demo():
     """
     Simple demo showing variational approach with activation maximization.
     """
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("SIMPLE VARIATIONAL FEATURE VISUALIZATION")
-    print("="*60)
+    print("=" * 60)
 
     # Setup
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"\nDevice: {device}")
 
     # Load model
@@ -35,35 +35,42 @@ def simple_variational_demo():
     model = model.to(device)
 
     # Target
-    layer_name = 'mixed4a_1x1_pre_relu_conv'
+    layer_name = "mixed4a_1x1_pre_relu_conv"
     channel_idx = 42
 
     # Hook to capture activations
     activations = {}
+
     def hook_fn(module, input, output):
-        activations['output'] = output
+        activations["output"] = output
 
     # Register hook
     for name, module in model.named_modules():
-        if name.replace('.', '_') == layer_name:
+        if name.replace(".", "_") == layer_name:
             module.register_forward_hook(hook_fn)
             print(f"Registered hook on: {name}")
             break
 
     # Create variational parameter
     image_param = VariationalImageParameter(
-        image_size=448,  # Higher resolution for more detail
+        image_size=224,  # Reduced resolution to avoid OOM
         channels=3,
         initial_log_sigma=-4.0,  # Start with lower variance for more focused optimization
-        device=device
+        device=device,
     )
 
     # Optimizer
-    optimizer = torch.optim.Adam(image_param.parameters(), lr=0.1)  # Higher learning rate
+    optimizer = torch.optim.Adam(
+        image_param.parameters(), lr=0.1
+    )  # Higher learning rate
 
     # Training loop
-    n_iterations = 800  # Even more iterations for highly refined visualization
-    n_samples = 32  # More samples for better gradient estimates
+    n_iterations = 1600  # Even more iterations for highly refined visualization
+    n_samples = 64  # Reduced samples to avoid OOM
+
+    # Clear GPU cache before starting
+    if device == "cuda":
+        torch.cuda.empty_cache()
 
     print(f"\nOptimizing for {n_iterations} iterations...")
     print(f"Samples per iteration: {n_samples}\n")
@@ -78,30 +85,36 @@ def simple_variational_demo():
 
         # Forward pass
         _ = model(images)
-        acts = activations['output'][:, channel_idx]
+        acts = activations["output"][:, channel_idx]
 
         # Objective: MAXIMIZE mean activation (so minimize negative)
         mean_activation = acts.mean()
         loss = -mean_activation
 
         # Add small variance penalty to prevent collapse
-        variance_penalty = 0.0005 * image_param.get_variance().mean()  # Lower penalty for more variation
+        variance_penalty = (
+            0.005 * image_param.get_variance().mean()
+        )  # Lower penalty for more variation
         total_loss = loss + variance_penalty
 
         # Backward
         total_loss.backward()
         optimizer.step()
 
-        loss_history.append({
-            'iteration': iteration,
-            'activation': mean_activation.item(),
-            'loss': total_loss.item(),
-            'variance': image_param.get_variance().mean().item()
-        })
+        loss_history.append(
+            {
+                "iteration": iteration,
+                "activation": mean_activation.item(),
+                "loss": total_loss.item(),
+                "variance": image_param.get_variance().mean().item(),
+            }
+        )
 
         if iteration % 50 == 0:
-            print(f"Iter {iteration:3d}: Activation = {mean_activation.item():8.4f}, "
-                  f"Variance = {image_param.get_variance().mean().item():.6f}")
+            print(
+                f"Iter {iteration:3d}: Activation = {mean_activation.item():8.4f}, "
+                f"Variance = {image_param.get_variance().mean().item():.6f}"
+            )
 
     print("\n[OK] Optimization complete!")
 
@@ -111,55 +124,63 @@ def simple_variational_demo():
 
     # Normalize mean image for display
     mean_image_np = mean_image.numpy().transpose(1, 2, 0)
-    mean_image_np = (mean_image_np - mean_image_np.min()) / (mean_image_np.max() - mean_image_np.min())
+    mean_image_np = (mean_image_np - mean_image_np.min()) / (
+        mean_image_np.max() - mean_image_np.min()
+    )
 
     # Create output directory
-    os.makedirs('screen_captures/variational', exist_ok=True)
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    os.makedirs("screen_captures/variational", exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     # Save mean image
     plt.figure(figsize=(8, 8))
     plt.imshow(mean_image_np)
-    plt.title(f'Mean Image: {layer_name}, channel {channel_idx}')
-    plt.axis('off')
-    mean_path = f'screen_captures/variational/{timestamp}_simple_mean.png'
-    plt.savefig(mean_path, bbox_inches='tight', dpi=300)  # Higher DPI for publication quality
+    plt.title(f"Mean Image: {layer_name}, channel {channel_idx}")
+    plt.axis("off")
+    mean_path = f"screen_captures/variational/{timestamp}_simple_mean.png"
+    plt.savefig(
+        mean_path, bbox_inches="tight", dpi=300
+    )  # Higher DPI for publication quality
     plt.close()
     print(f"\nSaved mean image: {mean_path}")
 
     # Save variance map
     plt.figure(figsize=(8, 8))
-    plt.imshow(variance.numpy(), cmap='hot')
-    plt.colorbar(label='Variance')
-    plt.title(f'Uncertainty Map: {layer_name}, channel {channel_idx}')
-    plt.axis('off')
-    var_path = f'screen_captures/variational/{timestamp}_simple_variance.png'
-    plt.savefig(var_path, bbox_inches='tight', dpi=300)  # Higher DPI for publication quality
+    plt.imshow(variance.numpy(), cmap="hot")
+    plt.colorbar(label="Variance")
+    plt.title(f"Uncertainty Map: {layer_name}, channel {channel_idx}")
+    plt.axis("off")
+    var_path = f"screen_captures/variational/{timestamp}_simple_variance.png"
+    plt.savefig(
+        var_path, bbox_inches="tight", dpi=300
+    )  # Higher DPI for publication quality
     plt.close()
     print(f"Saved variance map: {var_path}")
 
     # Plot training curves
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
 
-    iterations = [h['iteration'] for h in loss_history]
-    activations_list = [h['activation'] for h in loss_history]
-    variances = [h['variance'] for h in loss_history]
+    iterations = [h["iteration"] for h in loss_history]
+    activations_list = [h["activation"] for h in loss_history]
+    variances = [h["variance"] for h in loss_history]
 
     ax1.plot(iterations, activations_list)
-    ax1.set_xlabel('Iteration')
-    ax1.set_ylabel('Mean Activation')
-    ax1.set_title('Activation Growth')
+    ax1.set_xlabel("Iteration")
+    ax1.set_ylabel("Mean Activation")
+    ax1.set_title("Activation Growth")
     ax1.grid(True, alpha=0.3)
 
     ax2.plot(iterations, variances)
-    ax2.set_xlabel('Iteration')
-    ax2.set_ylabel('Mean Variance')
-    ax2.set_title('Uncertainty Evolution')
+    ax2.set_xlabel("Iteration")
+    ax2.set_ylabel("Mean Variance")
+    ax2.set_title("Uncertainty Evolution")
     ax2.grid(True, alpha=0.3)
 
     plt.tight_layout()
-    curve_path = f'screen_captures/variational/{timestamp}_simple_curves.png'
-    plt.savefig(curve_path, bbox_inches='tight', dpi=300)  # Higher DPI for publication quality
+    curve_path = f"screen_captures/variational/{timestamp}_simple_curves.png"
+    plt.savefig(
+        curve_path, bbox_inches="tight", dpi=300
+    )  # Higher DPI for publication quality
     plt.close()
     print(f"Saved training curves: {curve_path}")
 
@@ -174,18 +195,20 @@ def simple_variational_demo():
         img = samples[i].transpose(1, 2, 0)
         img = (img - img.min()) / (img.max() - img.min())
         ax.imshow(img)
-        ax.axis('off')
+        ax.axis("off")
 
-    plt.suptitle(f'Samples from Distribution: {layer_name}, channel {channel_idx}')
+    plt.suptitle(f"Samples from Distribution: {layer_name}, channel {channel_idx}")
     plt.tight_layout()
-    samples_path = f'screen_captures/variational/{timestamp}_simple_samples.png'
-    plt.savefig(samples_path, bbox_inches='tight', dpi=300)  # Higher DPI for publication quality
+    samples_path = f"screen_captures/variational/{timestamp}_simple_samples.png"
+    plt.savefig(
+        samples_path, bbox_inches="tight", dpi=300
+    )  # Higher DPI for publication quality
     plt.close()
     print(f"Saved samples: {samples_path}")
 
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("DEMO COMPLETE!")
-    print("="*60)
+    print("=" * 60)
     print(f"\nFinal mean activation: {activations_list[-1]:.4f}")
     print(f"Final variance: {variances[-1]:.6f}")
     print(f"\nCheck screen_captures/variational/ for results")
