@@ -534,6 +534,240 @@ Analyze the actual activation patterns during visualization optimization.
 
 ---
 
+### 1.6 Information-Theoretic Segmentation Objective ⭐⭐⭐ (Lyn Hibbard's Algorithm)
+
+**Module**: `segmentation_objective.py`, enhancements to `objective_generators.py`
+
+Integrate Lyn Hibbard's information-theoretic segmentation algorithm to guide visualization optimization toward well-structured images with clear figure-ground separation.
+
+**Conceptual Foundation**:
+
+The core principle is to maximize the **relative entropy (KL divergence) between "figure" and "ground"** regions:
+- **Figure**: Central region containing the primary neural feature being visualized
+- **Ground**: Surrounding background region with significantly different statistical properties
+- **Information-Theoretic Measure**: Use relative entropy to quantify the distinctness between regions
+
+This encourages the optimization to generate interpretable visualizations where the activated feature is clearly separated from the background, improving both visual quality and interpretability.
+
+**Implementation Details**:
+
+**1. Segmentation Module** (`segmentation_objective.py`):
+```python
+class SegmentationObjective:
+    """
+    Information-theoretic segmentation objective using Lyn Hibbard's algorithm.
+    """
+    - compute_figure_ground_separation()
+    - estimate_figure_region()  # e.g., center region, thresholded region
+    - compute_relative_entropy()  # KL divergence between figure/ground
+    - compute_segmentation_loss()  # Differentiable loss for optimization
+    - visualize_figure_ground()  # Show segmentation overlay
+```
+
+**2. Region Detection Strategies**:
+- **Spatial center**: Fixed NxN center region (simple baseline)
+- **Thresholded**: Regions above intensity threshold (adaptive)
+- **Attention-based**: Regions with highest gradient magnitude
+- **Watershed**: Connected component analysis for natural boundaries
+- **Multi-scale**: Hierarchical detection at multiple scales
+
+**3. Statistical Measures for Entropy Computation**:
+
+For each region (figure/ground), compute distributions:
+```python
+# Histogram-based entropy
+- Intensity distribution (grayscale)
+- RGB color distribution
+- Gabor response distribution
+- Texture statistics (entropy, contrast, correlation)
+
+# Statistical moments
+- Mean, variance, skewness, kurtosis
+- Spatial autocorrelation
+- Edge density and orientation
+
+# Information-theoretic measures
+- Shannon entropy H(region)
+- Relative entropy D_KL(figure || ground)
+- Mutual information I(figure; ground)
+- Jensen-Shannon divergence (symmetric alternative)
+```
+
+**4. Integration with Optimization Loop**:
+
+During visualization generation, combine objectives:
+```python
+total_loss = (
+    lambda_primary * primary_objective_loss  # Channel/neuron/Gabor objective
+    + lambda_segmentation * segmentation_loss  # Information-theoretic separation
+    + lambda_regularization * regularization_loss  # Standard regularization
+)
+```
+
+Configurable weights (defaults):
+- `lambda_primary`: 1.0 (main feature visualization)
+- `lambda_segmentation`: 0.3-0.5 (encourage segmentation, secondary)
+- `lambda_regularization`: 0.01 (prevent artifacts)
+
+**5. New Database Columns**:
+```python
+- figure_entropy           # Shannon entropy of figure region
+- ground_entropy          # Shannon entropy of ground region
+- relative_entropy        # KL divergence D_KL(figure || ground)
+- segmentation_quality    # Overall figure-ground separation score
+- figure_region_path      # Visualization of segmented regions
+- figure_area_fraction    # What % of image is "figure"
+- figure_center_offset    # How centered is the figure
+```
+
+**6. Configuration in Enhanced Generator**:
+
+```python
+segmentation_config = {
+    'enabled': True,
+    'region_detection': 'thresholded',  # or 'center', 'attention', 'watershed'
+    'entropy_measure': 'kl_divergence',  # or 'jensen_shannon', 'mutual_information'
+    'figure_weight': 0.4,  # Strength of segmentation objective
+    'visualize_regions': True,  # Save figure/ground overlay
+}
+
+# Use in generation
+generator = EnhancedVisualizationGenerator(
+    model_name='inception_v1',
+    segmentation_config=segmentation_config
+)
+
+result = generator.generate_single_visualization(
+    objective_params={
+        'layer': 'mixed4c',
+        'channel': 42,
+    },
+    enable_segmentation=True,
+)
+```
+
+**7. Segmentation-Aware Evolution**:
+
+Mutation system can target segmentation quality:
+```python
+# Reward mutations that improve segmentation
+fitness_score = (
+    alpha * user_rating
+    + beta * relative_entropy  # Information-theoretic separation
+    + gamma * novelty_score
+)
+
+# Select parents with good segmentation
+best_segmented = visualizations.nlargest(k, 'relative_entropy')
+```
+
+**8. Analysis Tools**:
+```python
+def compare_segmentation_quality(visualizations):
+    """Compare segmentation effectiveness across layers/channels"""
+    # Plot: relative_entropy vs layer
+    # Plot: segmentation_quality vs user_rating
+    # Identify: which layers benefit most from segmentation
+
+def analyze_figure_statistics(image, figure_region):
+    """Extract and analyze figure region statistics"""
+    # Texture features, color histograms, edge density
+
+def create_segmentation_visualization(image, figure_mask):
+    """Create publication-ready figure-ground visualization"""
+    # Overlay showing figure/ground boundary
+    # Entropy heatmaps for each region
+```
+
+**9. Use Cases**:
+- **Improved interpretability**: Visualizations with clear semantic structure
+- **Evolutionary guidance**: Fitness function incorporating information theory
+- **Layer analysis**: Identify which layers naturally produce segmentable features
+- **Quality control**: Automatic flagging of "messy" vs "well-segmented" visualizations
+- **Publication-ready**: Figures with clear feature separation for papers
+- **Research questions**:
+  - Do deeper layers produce more segmentable features?
+  - Can we predict segmentation quality from layer type?
+  - How does segmentation quality correlate with neural network performance?
+
+**10. Advanced Features**:
+
+**Multi-Scale Segmentation**:
+```python
+# Compute segmentation at multiple scales
+scales = [32, 64, 128, 256]
+segmentation_objectives = [
+    create_segmentation_objective(scale, entropy_measure='kl')
+    for scale in scales
+]
+# Combine objectives: maximize segmentation at all scales
+```
+
+**Adaptive Weighting**:
+```python
+# Adjust lambda_segmentation based on optimization progress
+def adaptive_segmentation_weight(step, total_steps):
+    # Start low, increase as optimization converges
+    # Helps primary objective explore, then refine structure
+    return 0.1 + 0.4 * (step / total_steps)
+```
+
+**Information-Theoretic Metrics Dashboard**:
+- Plot relative entropy over optimization steps
+- Compare figure vs ground entropy distributions
+- Visualize segmentation quality across layers/channels
+- Identify "hard to segment" vs "naturally segmentable" features
+
+**11. Research Integration**:
+
+**Comparison with Hibbard's Original Work**:
+- Implement core relative entropy calculation
+- Compare to original segmentation algorithm
+- Validate that KL divergence effectively separates regions
+- Document differences/improvements for neural features
+
+**Theoretical Justification**:
+- High relative entropy = figure and ground have very different statistics
+- This enforces structure without hand-crafted spatial priors
+- Information-theoretic approach is principled and interpretable
+- Connection to visual perception research on figure-ground separation
+
+**12. Dependencies**:
+- `numpy`, `scipy` (for entropy computation)
+- `scikit-image` (optional, for watershed/morphology)
+- `opencv-python` (optional, for advanced region detection)
+- No new external dependencies required for basic version
+
+**13. Performance**:
+- Minimal overhead (~10-20% slower generation) due to entropy computation
+- Can be computed in parallel with primary objective
+- Entropy computation is differentiable (can backprop through it)
+
+**Time Estimates**:
+- Basic implementation (center region + KL divergence): 3-4 days
+- Region detection methods: 2-3 days
+- Integration with EnhancedVisualizationGenerator: 2 days
+- Mutation system enhancement: 2 days
+- Analysis tools and dashboard: 3-4 days
+- Total: ~2 weeks for complete implementation
+
+**Integration with Roadmap**:
+- Works with existing objective types (channel, neuron, Gabor)
+- Enhances atlas generation (1.2) - produces more interpretable visualizations
+- Complements perceptual quality metrics (1.4) - adds structural quality
+- Improves mutation system - segmentation quality as fitness component
+- Compatible with depth analysis (1.1) - both provide structural understanding
+
+**Benefits Over Pure Generative Optimization**:
+- ✅ Emergence of semantic structure from information theory (not imposed)
+- ✅ Highly interpretable - figure-ground separation is cognitively natural
+- ✅ Reproducible - information-theoretic measures are objective and mathematical
+- ✅ Scalable - works with any visualization objective
+- ✅ Research-grade - principled approach suitable for publications
+- ✅ Tunable - adjustable weights allow balancing primary vs segmentation objectives
+
+---
+
 ## Priority 2: Advanced Objective Types
 
 ### 2.1 Multi-Layer Objectives
@@ -926,17 +1160,394 @@ Use real images to guide visualizations.
 
 ## Priority 7: Experimental Features
 
-### 7.1 NeRF-Style 3D Visualizations
+### 7.1 NeRF-Style 3D Visualizations ⭐⭐⭐⭐
 
-**Module**: `nerf_visualizations.py`
+**Module**: `nerf_visualizations.py`, `nerf_renderer.py`, `volumetric_optimization.py`
 
-Generate 3D neural radiance fields representing network activations.
+Generate 3D neural radiance fields (NeRFs) representing network activations with full volumetric representation and novel view synthesis.
 
-**Features**:
-- 3D consistent visualizations from multiple viewpoints
-- Novel view synthesis of activation patterns
-- Integration with depth estimation for geometry
-- 360° video generation
+**Conceptual Foundation**:
+
+NeRF-based visualization creates a **continuous 3D volumetric representation** of what a neural network channel or neuron "sees" across all spatial dimensions. Unlike 2D feature visualizations, NeRF-based approach:
+- Generates 3D-consistent features that look coherent from any viewing angle
+- Captures volumetric structure (not just surface appearance)
+- Enables interactive 3D exploration and 360° rotation
+- Integrates naturally with depth estimation for geometry guidance
+- Produces publication-ready 3D visualizations and videos
+
+**Implementation Details**:
+
+**1. Core NeRF Architecture**:
+
+```python
+class ActivationNeRF:
+    """
+    Neural Radiance Field for network activation visualization.
+
+    Represents activation patterns as a continuous 3D function:
+    F_θ(x, y, z, θ, φ) → (r, g, b, density)
+
+    Where:
+    - (x, y, z): 3D spatial coordinates
+    - (θ, φ): View direction (azimuth, elevation)
+    - (r, g, b): RGB color at that point
+    - density: Volume opacity at that point
+    """
+
+    # Positional encoding for coordinates
+    - encode_position(x, y, z)          # Fourier features for position
+    - encode_direction(theta, phi)      # Fourier features for viewpoint
+
+    # Core network components
+    - mlp_coarse(pos_encoded, dir_encoded) → (rgb, density)
+    - mlp_fine(pos_encoded, dir_encoded)   → (rgb, density)  # Hierarchical sampling
+
+    # Rendering operations
+    - render_rays(rays, samples_per_ray)
+    - volumetric_rendering(rgb, density, z_vals)
+    - compute_loss(rendered, target)
+```
+
+**2. Input Representation Strategies**:
+
+**Option A: Channel NeRF** (most practical):
+```python
+# Optimize a NeRF that maximizes activation of a specific channel
+objective_params = {
+    'layer': 'mixed4c',
+    'channel': 42,
+    'nerf_type': 'channel',      # Maximize channel activation
+    'use_depth_guidance': True,   # Use depth estimation to guide geometry
+}
+
+# Result: 3D volumetric visualization of what channel 42 encodes
+```
+
+**Option B: Neuron NeRF** (spatial):
+```python
+# Optimize a NeRF that maximizes a specific spatial location (neuron)
+objective_params = {
+    'layer': 'mixed4c',
+    'spatial_pos': (10, 15),      # (y, x) position in feature map
+    'nerf_type': 'neuron',
+}
+```
+
+**Option C: Multi-Channel NeRF** (semantic):
+```python
+# Optimize a NeRF combining multiple channels
+objective_params = {
+    'layer': 'mixed4c',
+    'channels': [10, 20, 30],     # RGB from three channels
+    'channel_assignment': 'rgb',  # R←ch10, G←ch20, B←ch30
+    'nerf_type': 'multi_channel',
+}
+```
+
+**3. NeRF Optimization Loop**:
+
+```python
+# Combine standard objectives with volumetric rendering
+total_loss = (
+    lambda_activation * activation_loss         # Primary: maximize channel activation
+    + lambda_rendering * rendering_loss         # Perceptual quality of rendered view
+    + lambda_depth * depth_guidance_loss        # Encourage 3D geometric consistency
+    + lambda_segmentation * segmentation_loss   # (Optional) Figure-ground separation
+    + lambda_smooth * smoothness_loss           # Spatial smoothness
+)
+
+# Optimization process:
+for step in range(num_steps):
+    # 1. Sample random camera rays
+    rays = sample_camera_rays(cam_params)
+
+    # 2. Coarse pass: hierarchical sampling
+    z_samples_coarse = stratified_sample(ray_length)
+    rgb_coarse, density_coarse = mlp_coarse(rays, z_samples_coarse)
+
+    # 3. Fine pass: importance sampling
+    z_samples_fine = importance_sample(density_coarse, z_samples_coarse)
+    rgb_fine, density_fine = mlp_fine(rays, z_samples_fine)
+
+    # 4. Volume rendering
+    image_fine = volumetric_render(rgb_fine, density_fine, z_samples_fine)
+
+    # 5. Compute activation loss (target activations)
+    activation_loss = compute_activation_loss(z_samples_fine, density_fine)
+
+    # 6. Compute rendering loss (optional: match target 2D image)
+    rendering_loss = mse(image_fine, target_image)
+
+    # 7. Depth guidance (optional: integrate depth estimation)
+    depth_from_nerf = compute_expected_depth(density_fine, z_vals)
+    depth_from_estimator = depth_anything(render_2d(image_fine))
+    depth_loss = depth_consistency(depth_from_nerf, depth_from_estimator)
+
+    # 8. Backward pass
+    total_loss = ... (as above)
+    optimizer.zero_grad()
+    total_loss.backward()
+    optimizer.step()
+```
+
+**4. Positional Encoding (Critical for NeRF)**:
+
+```python
+def positional_encoding(x, L=10):
+    """
+    Map coordinates to high-dimensional space for better function approximation.
+    Essential for NeRF to capture fine details.
+
+    γ(x) = [sin(2^0 π x), cos(2^0 π x), ..., sin(2^(L-1) π x), cos(2^(L-1) π x)]
+    """
+    encoded = []
+    for i in range(L):
+        encoded.append(torch.sin((2**i) * np.pi * x))
+        encoded.append(torch.cos((2**i) * np.pi * x))
+    return torch.cat(encoded)
+
+# For 3D position: encode x, y, z separately → 6L dimensions
+# For direction: encode theta, phi separately → 4L dimensions
+```
+
+**5. Rendering Pipeline**:
+
+```python
+def render(rays, model, num_coarse_samples, num_fine_samples):
+    """
+    Ray marching through volumetric NeRF representation.
+    """
+    # 1. Coarse sampling: uniformly sample along ray
+    z_coarse = torch.linspace(z_near, z_far, num_coarse_samples)
+    pts_coarse = rays.origin[:, None] + rays.direction[:, None] * z_coarse[None, :]
+
+    # 2. Evaluate coarse NeRF
+    rgb_coarse, density_coarse = model.mlp_coarse(
+        encode_position(pts_coarse),
+        encode_direction(rays.direction)
+    )
+
+    # 3. Volumetric rendering (coarse)
+    weights = compute_weights(density_coarse, z_coarse)
+    image_coarse = weighted_sum(rgb_coarse * weights)
+
+    # 4. Fine sampling: importance sampling based on coarse weights
+    z_fine = importance_sample(weights, z_coarse)
+    pts_fine = rays.origin[:, None] + rays.direction[:, None] * z_fine[None, :]
+
+    # 5. Evaluate fine NeRF
+    rgb_fine, density_fine = model.mlp_fine(
+        encode_position(pts_fine),
+        encode_direction(rays.direction)
+    )
+
+    # 6. Final volumetric rendering (fine)
+    weights_fine = compute_weights(density_fine, z_fine)
+    image_fine = weighted_sum(rgb_fine * weights_fine)
+
+    return image_coarse, image_fine, weights_fine, z_fine
+```
+
+**6. Camera Control & Viewpoint Sampling**:
+
+```python
+# Define camera trajectory for exploration
+camera_poses = [
+    {'azimuth': 0, 'elevation': 0, 'distance': 1.5},      # Front
+    {'azimuth': 90, 'elevation': 0, 'distance': 1.5},     # Right
+    {'azimuth': 180, 'elevation': 0, 'distance': 1.5},    # Back
+    {'azimuth': 270, 'elevation': 0, 'distance': 1.5},    # Left
+    {'azimuth': 0, 'elevation': 45, 'distance': 1.5},     # Top
+]
+
+# Render multiple viewpoints
+for pose in camera_poses:
+    rays = pose_to_rays(pose)
+    image = render(rays, nerf_model, ...)
+    save_image(f"view_{pose['azimuth']}_{pose['elevation']}.png", image)
+```
+
+**7. Depth Guidance Integration**:
+
+```python
+# Use Depth Anything V2 to guide volumetric geometry
+def depth_guided_loss(image_rendered, nerf_depth, learnable_depth_scale):
+    """
+    Align NeRF-derived depth with depth estimation model.
+
+    This creates a "reality anchor" - the NeRF learns 3D structure
+    that's consistent with depth prediction models trained on real images.
+    """
+
+    # Get depth from depth model
+    depth_model = load_depth_anything_v2('large')
+    depth_predicted = depth_model(image_rendered)
+
+    # Extract depth from NeRF volumetric representation
+    depth_from_nerf = compute_expected_depth(
+        density_volumetric=density_samples,
+        z_values=z_samples,
+    )
+
+    # Align scales and compute loss
+    depth_scaled = depth_from_nerf * learnable_depth_scale
+    loss = huber_loss(depth_scaled, depth_predicted)
+
+    return loss
+```
+
+**8. Video Generation from NeRF**:
+
+```python
+# Generate smooth video by interpolating camera poses
+camera_trajectory = interpolate_poses(keyframe_poses, num_frames=300)
+
+video_frames = []
+for pose in camera_trajectory:
+    rays = pose_to_rays(pose)
+    frame = render(rays, nerf_model)
+    video_frames.append(frame)
+
+# Encode to video file
+write_video('nerf_visualization_360.mp4', video_frames, fps=30)
+```
+
+**9. Output Formats**:
+- **Single image**: High-quality render from canonical viewpoint
+- **Multi-view grid**: 2×3 or 3×3 grid showing different angles
+- **360° video**: Full rotation animation (mp4, webm)
+- **Interactive viewer**: Web-based 3D visualization (Three.js)
+- **3D mesh export**: Extract iso-surface as .obj for 3D software
+- **Point cloud**: Export density field as point cloud
+
+**10. New Database Columns**:
+```python
+- nerf_model_path         # Path to saved NeRF weights
+- nerf_canonical_image    # Front-facing view
+- nerf_multiview_grid     # 6-view grid for thumbnail
+- nerf_video_path         # Path to 360° video
+- nerf_depth_guidance     # Was depth guidance used?
+- nerf_training_steps     # Optimization steps for NeRF
+- nerf_loss_history       # JSON-encoded training curve
+- nerf_rendering_time     # Time to render reference images
+```
+
+**11. Integration with Existing System**:
+
+```python
+# Seamless integration with EnhancedVisualizationGenerator
+generator = EnhancedVisualizationGenerator(
+    model_name='inception_v1',
+    visualization_type='nerf',  # NEW
+    nerf_config={
+        'enable_depth_guidance': True,
+        'enable_segmentation': True,  # Can combine with seg objective
+        'camera_trajectory': 'full_rotation',
+        'render_resolution': 512,
+        'num_training_steps': 2000,
+    }
+)
+
+result = generator.generate_single_visualization(
+    objective_params={'layer': 'mixed4c', 'channel': 42},
+    visualization_type='nerf',
+)
+
+# Output includes:
+# - result['canonical_image']: Front view
+# - result['multiview_grid']: 6-view comparison
+# - result['video_path']: 360° rotation video
+# - result['nerf_weights']: Saved model for interactive exploration
+```
+
+**12. Advanced Features**:
+
+**Animated NeRFs** (temporal 4D):
+```python
+# Extend NeRF to include time dimension: F_θ(x, y, z, t, θ, φ)
+# Generate morphing NeRF between two channels
+
+nerf_source = NeRF(channel=10)   # Initial state
+nerf_target = NeRF(channel=42)   # Target state
+
+# Interpolate between them
+for alpha in linspace(0, 1, 60):
+    nerf_interpolated = blend_nerf_weights(nerf_source, nerf_target, alpha)
+    render_frame = render(rays, nerf_interpolated)
+    # Frame shows smooth transition
+```
+
+**Semantic NeRFs** (multi-channel blending):
+```python
+# Composite multiple channels into single NeRF with semantic meaning
+# E.g., Red = edge detector, Green = blob detector, Blue = texture
+
+nerf_semantic = MultiChannelNeRF(
+    channels={'red': 10, 'green': 20, 'blue': 30},
+    blend_type='additive',  # or 'multiplicative', 'weighted'
+)
+```
+
+**13. Configuration Example**:
+```yaml
+# config/nerf_config.yaml
+nerf:
+  model:
+    coarse_network: [256, 256, 256, 256]  # MLP architecture
+    fine_network: [256, 256, 256, 256, 256, 256, 256]
+    pos_encoding_freq: 10  # Positional encoding frequency
+    dir_encoding_freq: 4   # Direction encoding frequency
+
+  rendering:
+    num_coarse_samples: 64
+    num_fine_samples: 128
+    z_near: 0.1
+    z_far: 8.0
+
+  optimization:
+    num_steps: 2000
+    learning_rate: 1e-3
+    optimizer: adam
+    scheduler: exponential_decay
+
+  guidance:
+    depth_enabled: true
+    depth_weight: 0.1
+    segmentation_enabled: true
+    segmentation_weight: 0.3
+
+  rendering:
+    output_resolution: 512
+    num_views: 6
+    generate_video: true
+    video_fps: 30
+```
+
+**14. Time Estimates**:
+- Basic NeRF implementation: 4-5 days
+- Positional encoding & rendering: 2-3 days
+- Depth guidance integration: 2-3 days
+- Segmentation combination: 1-2 days
+- Video generation: 1 day
+- Interactive viewer: 2-3 days
+- Analysis tools & dashboard: 2-3 days
+- Total: ~3-4 weeks for complete implementation
+
+**15. Research Opportunities**:
+- **Novel view synthesis**: Can the NeRF generalize to unseen viewpoints?
+- **3D semantics**: Do different layers encode different 3D structures?
+- **Depth consistency**: How well do NeRF depths match real depth models?
+- **Temporal coherence**: Can we create animated NeRFs showing feature evolution?
+- **Cross-layer relationships**: How do 3D structures evolve across layers?
+
+**Benefits**:
+- ✅ Full 3D understanding of activation patterns
+- ✅ Novel view synthesis for new perspectives
+- ✅ Integration with depth estimation for geometric grounding
+- ✅ Publication-ready visualizations with 360° videos
+- ✅ Interactive exploration of neural representations
+- ✅ Combination with segmentation for interpretable structure
+- ✅ Unique research contribution for interpretability papers
 
 ---
 
@@ -975,17 +1586,19 @@ Human-in-the-loop optimization with real-time feedback.
 2. ⭐⭐ InceptionV1 Training from Scratch (6.1) - YOUR REQUEST #2
 3. ⭐⭐⭐ Complete InceptionV1 Channel Atlas (1.2) - YOUR REQUEST #3
 4. ⭐⭐⭐⭐ Enhanced Continuous/Wrapping Visualizations (1.3) - YOUR REQUEST #4 (Already 50% complete!)
-5. Perceptual Quality Metrics (1.4)
+5. ⭐⭐⭐⭐ Information-Theoretic Segmentation Objective (1.6) - Lyn Hibbard's Algorithm
+6. ⭐⭐⭐⭐ NeRF-Style 3D Visualizations (7.1) - Neural Radiance Fields for Activation Visualization
+7. Perceptual Quality Metrics (1.4)
 
 **Medium Priority (6-12 months)**:
-6. Temporal/Video Objectives (2.2)
-7. Activation Statistics Analysis (1.3)
-8. 3D Visualization Interface (3.2)
-9. Distributed Generation (4.1)
-10. Comparative Analysis Dashboard (5.1)
+8. Activation Statistics Analysis (1.5)
+9. Temporal/Video Objectives (2.2)
+10. 3D Visualization Interface (3.2)
+11. Distributed Generation (4.1)
+12. Comparative Analysis Dashboard (5.1)
 
 **Lower Priority (12+ months)**:
-11. All remaining features based on research needs and user feedback
+13. All remaining features based on research needs and user feedback
 
 ---
 
