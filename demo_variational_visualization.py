@@ -3,8 +3,22 @@ End-to-end demo of variational Bayesian feature visualization.
 
 This demo shows how to use the variational approach with InceptionV1
 to generate feature visualizations with different priors.
+
+IMPORTANT PARAMETER GUIDANCE:
+- target_mean: Should be HIGH (10.0-20.0) to encourage strong activations
+  Setting this too low (e.g., 0.0) will prevent feature visualization from working!
+
+- target_scale/target_std: Should be wide (3.0-5.0) to allow flexibility
+  Too narrow will over-constrain the optimization
+
+- sparsity_weight: Should be LOW (0.01-0.1) to avoid suppressing activations
+  Too high will create blank images
+
+- Kurtosis prior: Matches distribution SHAPE only, doesn't encourage high activations
+  Use with caution - may need combining with other objectives
 """
 
+import argparse
 import torch
 import torch.nn as nn
 from lucent.modelzoo import inceptionv1
@@ -197,9 +211,51 @@ def save_results(results, output_dir='screen_captures/variational'):
     print(f"Saved loss curve to: {loss_path}")
 
 
-def compare_priors_demo():
+def parse_args():
+    """Parse command-line arguments."""
+    parser = argparse.ArgumentParser(
+        description='Variational Bayesian Feature Visualization Demo',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+
+    # Optimization parameters
+    parser.add_argument('--iterations', '-i', type=int, default=50,
+                        help='Number of optimization iterations')
+    parser.add_argument('--batch-size', '-b', type=int, default=8,
+                        help='Number of samples for Monte Carlo estimation (n_samples)')
+    parser.add_argument('--image-size', '-s', type=int, default=224,
+                        help='Size of generated image (InceptionV1 requires >= 224)')
+    parser.add_argument('--learning-rate', '-lr', type=float, default=0.1,
+                        help='Learning rate for optimizer')
+
+    # Target parameters
+    parser.add_argument('--layer', '-l', type=str, default='mixed4a_1x1_pre_relu_conv',
+                        help='Target layer name')
+    parser.add_argument('--channel', '-c', type=int, default=42,
+                        help='Target channel index')
+
+    # Demo selection
+    parser.add_argument('--demo', '-d', type=str, default='compare_priors',
+                        choices=['compare_priors', 'entropy', 'both'],
+                        help='Which demo to run')
+
+    # Device
+    parser.add_argument('--device', type=str, default=None,
+                        help='Device to use (cuda/cpu). Auto-detects if not specified.')
+
+    # Output
+    parser.add_argument('--output-dir', '-o', type=str, default='screen_captures/variational',
+                        help='Output directory for results')
+
+    return parser.parse_args()
+
+
+def compare_priors_demo(args=None):
     """
     Compare different prior types on the same layer/channel.
+
+    Args:
+        args: Parsed command-line arguments (optional)
     """
     print("\n" + "="*60)
     print("DEMO: Comparing Different Priors")
@@ -210,43 +266,61 @@ def compare_priors_demo():
     model = inceptionv1(pretrained=True)
     model.eval()
 
-    # Target layer and channel
-    layer_name = 'mixed4a_1x1_pre_relu_conv'
-    channel_idx = 42
-
-    # Configuration
-    config = {
-        'n_iterations': 50,
-        'n_samples': 8,
-        'image_size': 224,  # InceptionV1 requires at least 224
-        'learning_rate': 0.1,
-        'device': 'cuda' if torch.cuda.is_available() else 'cpu'
-    }
+    # Use args if provided, otherwise use defaults
+    if args is None:
+        layer_name = 'mixed4a_1x1_pre_relu_conv'
+        channel_idx = 42
+        config = {
+            'n_iterations': 800,
+            'n_samples': 64,
+            'image_size': 224,
+            'learning_rate': 0.1,
+            'device': 'cuda' if torch.cuda.is_available() else 'cpu'
+        }
+        output_dir = 'screen_captures/variational'
+    else:
+        layer_name = args.layer
+        channel_idx = args.channel
+        config = {
+            'n_iterations': args.iterations,
+            'n_samples': args.batch_size,
+            'image_size': args.image_size,
+            'learning_rate': args.learning_rate,
+            'device': args.device if args.device else ('cuda' if torch.cuda.is_available() else 'cpu')
+        }
+        output_dir = args.output_dir
 
     print(f"Device: {config['device']}")
+    print(f"Iterations: {config['n_iterations']}")
+    print(f"Batch size (n_samples): {config['n_samples']}")
+    print(f"Image size: {config['image_size']}")
+    print(f"Learning rate: {config['learning_rate']}")
+    print(f"Layer: {layer_name}")
+    print(f"Channel: {channel_idx}")
 
     # Move model to device
     model = model.to(config['device'])
 
     # Test different priors
+    # NOTE: target_mean should be HIGH to encourage strong activations
     priors = [
         {
-            'name': 'Laplace (Sparsity)',
+            'name': 'Laplace (High Target)',
             'prior_type': 'laplace',
             'entropy_weight': 0.0,
-            'prior_kwargs': {'target_mean': 0.0, 'target_scale': 2.0}
+            'prior_kwargs': {'target_mean': 10.0, 'target_scale': 5.0}  # High mean, wide scale
         },
         {
-            'name': 'Sparse Gaussian (High Activation)',
+            'name': 'Sparse Gaussian (Very High Activation)',
             'prior_type': 'sparse_gaussian',
             'entropy_weight': 0.0,
-            'prior_kwargs': {'target_mean': 5.0, 'target_std': 1.0, 'sparsity_weight': 0.1}
+            'prior_kwargs': {'target_mean': 15.0, 'target_std': 3.0, 'sparsity_weight': 0.05}  # Higher mean, lower sparsity
         },
         {
             'name': 'Kurtosis Matching (Super-Gaussian)',
             'prior_type': 'kurtosis',
             'entropy_weight': 0.0,
-            'prior_kwargs': {'target_kurtosis': 5.0}
+            'prior_kwargs': {'target_kurtosis': 5.0}  # WARNING: Doesn't encourage high activations by itself!
         },
     ]
 
@@ -301,7 +375,7 @@ def entropy_regularization_demo():
     model = inceptionv1(pretrained=True)
     model.eval()
 
-    layer_name = 'mixed4a_3x3_bottleneck_pre_relu_conv'
+    layer_name = 'mixed4e_3x3_bottleneck_pre_relu_conv'
     channel_idx = 10
 
     config = {
@@ -310,7 +384,7 @@ def entropy_regularization_demo():
         'image_size': 224,  # InceptionV1 requires at least 224
         'learning_rate': 0.1,
         'prior_type': 'sparse_gaussian',
-        'prior_kwargs': {'target_mean': 5.0, 'target_std': 1.0},
+        'prior_kwargs': {'target_mean': 15.0, 'target_std': 3.0, 'sparsity_weight': 0.05},  # Higher target for strong activations
         'device': 'cuda' if torch.cuda.is_available() else 'cpu'
     }
 

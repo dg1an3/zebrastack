@@ -4,15 +4,26 @@ import random
 import yaml
 from datetime import datetime
 from PIL import Image
+from lucent.modelzoo import inceptionv1
+from lucent_layer_utils import get_visualizable_layers
 
 # Set page config for wider layout
 st.set_page_config(page_title="Image Selection App", layout="wide")
+
+# Load InceptionV1 model and get valid layer names
+@st.cache_resource
+def get_valid_inception_layers():
+    """Get all valid InceptionV1 layer names for filtering folders"""
+    model = inceptionv1(pretrained=True)
+    return set(get_visualizable_layers(model))
+
+VALID_LAYER_NAMES = get_valid_inception_layers()
 
 
 # Function to recursively find all valid folders with images
 def find_valid_folders(base_path, excluded_folders):
     valid_folders = []
-    
+
     def scan_directory(path):
         try:
             for item in os.scandir(path):
@@ -20,22 +31,24 @@ def find_valid_folders(base_path, excluded_folders):
                     folder_name = item.name
                     # Skip excluded folders entirely (don't recurse into them)
                     if folder_name not in excluded_folders:
-                        # Check if this folder has images
-                        try:
-                            images = [
-                                f for f in os.listdir(item.path)
-                                if f.lower().endswith(("png", "jpg", "jpeg"))
-                            ]
-                            if len(images) >= 3:
-                                valid_folders.append(item.path)
-                        except (PermissionError, OSError):
-                            pass  # Skip folders we can't access
-                        
-                        # Recursively scan subfolders
+                        # Only include folders that match InceptionV1 layer names
+                        if folder_name in VALID_LAYER_NAMES:
+                            # Check if this folder has images
+                            try:
+                                images = [
+                                    f for f in os.listdir(item.path)
+                                    if f.lower().endswith(("png", "jpg", "jpeg"))
+                                ]
+                                if len(images) >= 3:
+                                    valid_folders.append(item.path)
+                            except (PermissionError, OSError):
+                                pass  # Skip folders we can't access
+
+                        # Still recurse into subfolders to find layer-named folders
                         scan_directory(item.path)
         except (PermissionError, OSError):
             pass  # Skip directories we can't access
-    
+
     scan_directory(base_path)
     return valid_folders
 
