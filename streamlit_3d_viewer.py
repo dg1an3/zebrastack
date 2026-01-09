@@ -8,7 +8,6 @@ Features:
 """
 
 import streamlit as st
-import os
 import random
 from pathlib import Path
 import numpy as np
@@ -181,7 +180,11 @@ def create_image_colorscale(img_arr: np.ndarray) -> list:
 def create_texture_surface(image_path: str, depth_path: str,
                           z_scale: float = 0.3,
                           downsample: int = 4,
-                          use_hemisphere: bool = True) -> go.Figure:
+                          use_hemisphere: bool = True,
+                          depth_alpha: bool = False,
+                          depth_darken: bool = False,
+                          effect_min: float = 0.2,
+                          effect_max: float = 1.0) -> go.Figure:
     """
     Create a 3D surface with proper texture mapping using Mesh3d with vertexcolor.
 
@@ -194,6 +197,10 @@ def create_texture_surface(image_path: str, depth_path: str,
         z_scale: Scale factor for depth displacement
         downsample: Factor to reduce resolution for performance
         use_hemisphere: If True, map onto a hemisphere with depth as displacement
+        depth_alpha: If True, use depth to control alpha (closer=opaque, far=transparent)
+        depth_darken: If True, darken far areas (no sorting needed, works with camera rotation)
+        effect_min: Minimum effect value for farthest points (0-1)
+        effect_max: Maximum effect value for closest points (0-1)
     """
     # Load images
     img = Image.open(image_path).convert('RGB')
@@ -280,12 +287,25 @@ def create_texture_surface(image_path: str, depth_path: str,
         img_arr_doubled = False
 
     # Create vertex colors from image (flatten RGB values)
-    r_flat = img_arr[:, :, 0].flatten()
-    g_flat = img_arr[:, :, 1].flatten()
-    b_flat = img_arr[:, :, 2].flatten()
+    r_flat = img_arr[:, :, 0].flatten().astype(float)
+    g_flat = img_arr[:, :, 1].flatten().astype(float)
+    b_flat = img_arr[:, :, 2].flatten().astype(float)
 
-    # Create color strings for each vertex
-    single_colors = [f'rgb({r},{g},{b})' for r, g, b in zip(r_flat, g_flat, b_flat)]
+    # Create color strings for each vertex (with optional effects based on depth)
+    if depth_alpha:
+        # Alpha based on depth: higher depth (closer) = more opaque
+        alpha_flat = depth_norm.flatten() * (effect_max - effect_min) + effect_min
+        single_colors = [f'rgba({int(r)},{int(g)},{int(b)},{a:.3f})' for r, g, b, a in zip(r_flat, g_flat, b_flat, alpha_flat)]
+    elif depth_darken:
+        # Darken based on depth: higher depth (closer) = brighter, lower = darker
+        # This doesn't require sorting and works correctly with camera rotation
+        brightness_flat = depth_norm.flatten() * (effect_max - effect_min) + effect_min
+        r_dark = (r_flat * brightness_flat).astype(int)
+        g_dark = (g_flat * brightness_flat).astype(int)
+        b_dark = (b_flat * brightness_flat).astype(int)
+        single_colors = [f'rgb({r},{g},{b})' for r, g, b in zip(r_dark, g_dark, b_dark)]
+    else:
+        single_colors = [f'rgb({int(r)},{int(g)},{int(b)})' for r, g, b in zip(r_flat, g_flat, b_flat)]
 
     # Double the colors if we have two hemispheres
     if img_arr_doubled:
@@ -328,6 +348,24 @@ def create_texture_surface(image_path: str, depth_path: str,
                 i_list.append(top_right + back_offset)
                 j_list.append(bottom_right + back_offset)
                 k_list.append(bottom_left + back_offset)
+
+    # Sort triangles by depth for proper alpha blending (back-to-front)
+    if depth_alpha:
+        # Calculate centroid depth for each triangle
+        i_arr = np.array(i_list)
+        j_arr = np.array(j_list)
+        k_arr = np.array(k_list)
+
+        # Get average x position (depth) for each triangle
+        # For hemisphere, x is the depth axis (positive = closer to camera)
+        tri_depth = (x_flat[i_arr] + x_flat[j_arr] + x_flat[k_arr]) / 3.0
+
+        # Sort triangles back-to-front (lower x first, then higher x on top)
+        sort_order = np.argsort(tri_depth)
+
+        i_list = i_arr[sort_order].tolist()
+        j_list = j_arr[sort_order].tolist()
+        k_list = k_arr[sort_order].tolist()
 
     # Create the figure with Mesh3d
     fig = go.Figure()
@@ -414,6 +452,18 @@ z_scale = st.sidebar.slider("Depth scale", 0.1, 1.0, 0.3, 0.05)
 downsample = st.sidebar.slider("Quality (lower = faster)", 1, 8, 4, 1)
 use_hemisphere = st.sidebar.checkbox("Hemisphere surface", value=True)
 
+st.sidebar.markdown("---")
+st.sidebar.subheader("Depth Effects")
+depth_effect = st.sidebar.radio("Depth effect", ["None", "Transparency", "Darken"],
+                                 help="None: solid colors, Transparency: alpha blend (static sort), Darken: dim far areas")
+depth_alpha = depth_effect == "Transparency"
+depth_darken = depth_effect == "Darken"
+if depth_effect != "None":
+    effect_min = st.sidebar.slider("Min effect (far)", 0.0, 1.0, 0.2, 0.05)
+    effect_max = st.sidebar.slider("Max effect (close)", 0.0, 1.0, 1.0, 0.05)
+else:
+    effect_min, effect_max = 1.0, 1.0
+
 # Find available images
 if st.sidebar.button("🔄 Refresh"):
     st.cache_data.clear()
@@ -459,7 +509,9 @@ if mode == "Random with depth":
 
             with col_right:
                 with st.spinner("Generating 3D surface..."):
-                    fig = create_texture_surface(img_path, depth_path, z_scale, downsample, use_hemisphere)
+                    fig = create_texture_surface(
+                        img_path, depth_path, z_scale, downsample, use_hemisphere,
+                        depth_alpha, depth_darken, effect_min, effect_max)
                     fig.update_layout(height=700)
                     st.plotly_chart(fig, use_container_width=True)
 
@@ -493,7 +545,9 @@ elif mode == "Browse all":
         if 'selected_for_3d' in st.session_state:
             img_path, depth_path = st.session_state['selected_for_3d']
             st.subheader(f"3D View: {Path(img_path).stem}")
-            fig = create_texture_surface(img_path, depth_path, z_scale, downsample, use_hemisphere)
+            fig = create_texture_surface(
+                img_path, depth_path, z_scale, downsample, use_hemisphere,
+                depth_alpha, depth_darken, effect_min, effect_max)
             st.plotly_chart(fig, use_container_width=True)
 
 elif mode == "Side by side":
@@ -515,6 +569,8 @@ elif mode == "Side by side":
 
         with col_right:
             with st.spinner("Generating 3D surface..."):
-                fig = create_texture_surface(img_path, depth_path, z_scale, downsample, use_hemisphere)
+                fig = create_texture_surface(
+                    img_path, depth_path, z_scale, downsample, use_hemisphere,
+                    depth_alpha, depth_darken, effect_min, effect_max)
                 fig.update_layout(height=700)
                 st.plotly_chart(fig, use_container_width=True)
