@@ -77,6 +77,7 @@ def select_images(base_path):
         f
         for f in os.listdir(selected_folder)
         if f.lower().endswith(("png", "jpg", "jpeg"))
+        and "_depth" not in f.lower()
     ]
     if len(images) < 3:
         # st.error(f"Not enough images in folder: {selected_folder}")
