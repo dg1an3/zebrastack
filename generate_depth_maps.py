@@ -49,10 +49,22 @@ class DepthMapGenerator:
 
         # Load transforms
         midas_transforms = torch.hub.load("intel-isl/MiDaS", "transforms")
-        if model_type in ["DPT_Large", "DPT_Hybrid"]:
-            self.transform = midas_transforms.dpt_transform
-        else:
+
+        # Select appropriate transform based on model type
+        if model_type in ["MiDaS_small", "midas_v21_small_256"]:
             self.transform = midas_transforms.small_transform
+        elif model_type in ["DPT_LeViT_224", "dpt_levit_224"]:
+            self.transform = midas_transforms.levit_transform
+        elif model_type in ["DPT_BEiT_L_512", "dpt_beit_large_512"]:
+            self.transform = midas_transforms.beit512_transform
+        elif model_type in ["DPT_SwinV2_T_256"]:
+            self.transform = midas_transforms.swin256_transform
+        elif model_type in ["DPT_SwinV2_L_384", "DPT_SwinV2_B_384", "DPT_Swin_L_384",
+                            "DPT_BEiT_L_384", "DPT_BEiT_B_384", "DPT_Next_ViT_L_384"]:
+            self.transform = midas_transforms.swin384_transform
+        else:
+            # DPT_Large, DPT_Hybrid use dpt_transform
+            self.transform = midas_transforms.dpt_transform
 
         logger.info("MiDaS model loaded successfully")
 
@@ -195,7 +207,13 @@ def main():
         "--model",
         type=str,
         default="DPT_Large",
-        choices=["DPT_Large", "DPT_Hybrid", "MiDaS_small"],
+        choices=[
+            "DPT_Large", "DPT_Hybrid", "MiDaS_small",
+            # MiDaS 3.1 models (use exact names from hubconf)
+            "DPT_BEiT_L_512", "DPT_BEiT_L_384", "DPT_BEiT_B_384",
+            "DPT_SwinV2_L_384", "DPT_SwinV2_B_384", "DPT_SwinV2_T_256",
+            "DPT_Swin_L_384", "DPT_Next_ViT_L_384", "DPT_LeViT_224"
+        ],
         help="MiDaS model type (default: DPT_Large)"
     )
     parser.add_argument(
