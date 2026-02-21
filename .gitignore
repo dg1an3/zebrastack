@@ -266,6 +266,6 @@ __pycache__/
 /*/data/*
 **/env/
 logs/*
-/FashionMnistVaeTfNet/.vs/FashionMnistVaeTfNet
-/FashionMnistVaeTfNet/bin
-/FashionMnistVaeTfNet/obj
+/fashionmnist/FashionMnistVaeTfNet/.vs/FashionMnistVaeTfNet
+/fashionmnist/FashionMnistVaeTfNet/bin
+/fashionmnist/FashionMnistVaeTfNet/obj
