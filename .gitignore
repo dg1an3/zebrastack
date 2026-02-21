@@ -269,3 +269,8 @@ logs/*
 /fashionmnist/FashionMnistVaeTfNet/.vs/FashionMnistVaeTfNet
 /fashionmnist/FashionMnistVaeTfNet/bin
 /fashionmnist/FashionMnistVaeTfNet/obj
+venv39/
+venv310/
+weights/
+runs/
+reconst_cxr8/

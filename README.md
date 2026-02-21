@@ -20,12 +20,21 @@ Other (non Cxr8) data
 ## FashionMNIST VAE (merged from zebrastack_fashionmnist)
 
 Continuation of VAE work adapted for FashionMNIST, including:
-- `zebrastack_model_v2.py` — V2 encoder model (V1>V2>V4 hierarchy)
-- `oriented_powermap_2d.py` — oriented power map layers
-- `logsumexp_pooling_2d.py` — logsumexp pooling
-- `anisotropic_diffusion.py` — anisotropic diffusion filter
-- `fashionmnist_train.ipynb` — training notebook
-- `FashionMnistVaeTfNet/` — C# TensorFlow.NET implementation
+- `fashionmnist/zebrastack_model_v2.py` — V2 encoder model (V1>V2>V4 hierarchy)
+- `fashionmnist/oriented_powermap_2d.py` — oriented power map layers
+- `fashionmnist/logsumexp_pooling_2d.py` — logsumexp pooling
+- `fashionmnist/anisotropic_diffusion.py` — anisotropic diffusion filter
+- `fashionmnist/fashionmnist_train.ipynb` — training notebook
+- `fashionmnist/FashionMnistVaeTfNet/` — C# TensorFlow.NET implementation
+
+## ResNet18-VAE / Herringstack (merged from resnet18-vae)
+
+Herring stack visual system model using ResNet as a base, including:
+- ResNet encoder/decoder with squeeze-excitation modules
+- Oriented power maps, CLAHE transform, filter utilities
+- CXR8, NLST, Oxford Flowers dataset loaders
+- HerringstackApi — C# ASP.NET Core API for image latent vectors
+- Training notebooks for ResNet34/50 VAE variants
 
 keras_autoencoder\build_autoencoder.py:from keras.models import Model
 keras_autoencoder\keras_autoencoder.py:from keras.models import Model
