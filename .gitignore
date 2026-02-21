@@ -265,3 +265,7 @@ __pycache__/
 /*/models
 /*/data/*
 **/env/
+logs/*
+/FashionMnistVaeTfNet/.vs/FashionMnistVaeTfNet
+/FashionMnistVaeTfNet/bin
+/FashionMnistVaeTfNet/obj
