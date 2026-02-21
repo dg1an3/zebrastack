@@ -36,6 +36,12 @@ Herring stack visual system model using ResNet as a base, including:
 - HerringstackApi — C# ASP.NET Core API for image latent vectors
 - Training notebooks for ResNet34/50 VAE variants
 
+## PyTorch CIFAR10 (merged from pytorch-cifar)
+
+CIFAR10 classification experiments with PyTorch, including model zoo:
+VGG, ResNet, DenseNet, DPN, DLA, MobileNet, EfficientNet, and more.
+Best accuracy: 95.47% (DLA).
+
 keras_autoencoder\build_autoencoder.py:from keras.models import Model
 keras_autoencoder\keras_autoencoder.py:from keras.models import Model
 anat0mixer\dynamic_routing_encoder.ipynb:    "from keras.models import Model\n",
