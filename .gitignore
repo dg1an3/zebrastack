@@ -275,3 +275,9 @@ weights/
 runs/
 reconst_cxr8/
 checkpoint/
+.venv
+onnx/
+screen_captures/
+visualization_log_*.txt
+IISStaticSite/
+.claude/settings.local.json
