@@ -97,15 +97,21 @@ class ReadoutHead(nn.Module):
 
     @torch.no_grad()
     def recalibrate_bn(self, backbone, calibration_x: torch.Tensor, batch_size: int = 32):
-        """Reset BN running stats and re-estimate them from the trained model."""
+        """Directly set BN running stats from the trained model's outputs.
+
+        Bypasses the momentum-based update so a single calibration pass
+        gives the exact training-set statistics; the eval-mode BN then
+        normalizes inputs identically to a final training-mode batch.
+        """
         backbone.eval()
-        self.bn.reset_running_stats()
-        self.bn.train()
+        all_pooled = []
         for i in range(0, calibration_x.shape[0], batch_size):
             x = calibration_x[i:i+batch_size]
             cells = backbone(x)["lie_cells"]
-            pooled = cells.mean(dim=(-1, -2))
-            _ = self.bn(pooled)
+            all_pooled.append(cells.mean(dim=(-1, -2)))
+        all_pooled = torch.cat(all_pooled, dim=0)
+        self.bn.running_mean.copy_(all_pooled.mean(dim=0))
+        self.bn.running_var.copy_(all_pooled.var(dim=0, unbiased=False))
         self.bn.eval()
 
     def forward(self, cells: torch.Tensor) -> torch.Tensor:
