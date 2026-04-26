@@ -82,44 +82,35 @@ def print_matrix(matrix):
 
 
 class ReadoutHead(nn.Module):
-    """Spatial pool + calibrated per-class scale + learnable bias.
+    """Spatial pool + BatchNorm + per-class affine on top of LieGroupCells.
 
-    Per-class scale is initialized to 1 / (mean cell activation observed
-    on a calibration set) so the three logits start on a comparable
-    magnitude and softmax doesn't saturate. Both scale and bias are
-    learnable. No running statistics, robust at eval time, and unlike
-    LayerNorm the network can grow logit spread to lower the loss.
+    BatchNorm normalizes each cell per batch during training, which
+    keeps the cross-entropy gradient well-scaled even as the cell
+    magnitudes drift. After training, ``recalibrate_bn`` replaces the
+    BN running statistics with stats computed from a clean forward pass
+    over the training set, so eval-mode predictions are stable.
     """
 
     def __init__(self, n_classes: int):
         super().__init__()
-        self.scale = nn.Parameter(torch.ones(n_classes))
-        self.bias = nn.Parameter(torch.zeros(n_classes))
+        self.bn = nn.BatchNorm1d(n_classes)
 
     @torch.no_grad()
-    def calibrate(self, backbone, calibration_x: torch.Tensor, batch_size: int = 16):
-        """Standardize each cell to zero mean, unit std on calibration data.
-
-        Equivalent to batch-normalizing once with fixed statistics, then
-        freezing. ``bias`` absorbs the mean (so logits start centered) and
-        ``scale`` is set to 1 / std (so logits start with unit spread).
-        Both remain learnable.
-        """
+    def recalibrate_bn(self, backbone, calibration_x: torch.Tensor, batch_size: int = 32):
+        """Reset BN running stats and re-estimate them from the trained model."""
         backbone.eval()
-        all_pooled = []
+        self.bn.reset_running_stats()
+        self.bn.train()
         for i in range(0, calibration_x.shape[0], batch_size):
             x = calibration_x[i:i+batch_size]
             cells = backbone(x)["lie_cells"]
-            all_pooled.append(cells.mean(dim=(-1, -2)))
-        all_pooled = torch.cat(all_pooled, dim=0)
-        mean = all_pooled.mean(dim=0)
-        std = all_pooled.std(dim=0).clamp_min(1e-12)
-        self.scale.data.copy_(1.0 / std)
-        self.bias.data.copy_(-mean / std)
+            pooled = cells.mean(dim=(-1, -2))
+            _ = self.bn(pooled)
+        self.bn.eval()
 
     def forward(self, cells: torch.Tensor) -> torch.Tensor:
         pooled = cells.mean(dim=(-1, -2))
-        return self.scale * pooled + self.bias
+        return self.bn(pooled)
 
 
 def train(backbone_model, head, train_x, train_y, epochs, lr, batch_size, weight_decay):
@@ -158,7 +149,7 @@ def main() -> int:
     parser.add_argument("--n-train", type=int, default=80)
     parser.add_argument("--n-test", type=int, default=30)
     parser.add_argument("--epochs", type=int, default=12)
-    parser.add_argument("--lr", type=float, default=0.01)
+    parser.add_argument("--lr", type=float, default=0.05)
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--weight-decay", type=float, default=1e-4)
     parser.add_argument("--train-v2", action="store_true",
@@ -210,14 +201,13 @@ def main() -> int:
         trainable_lie_cells=True,
     )
     head = ReadoutHead(len(CLASS_NAMES))
-    head.calibrate(trained, train_x)
-    print(f"  calibrated scale: {head.scale.detach().tolist()}")
-    print(f"  calibrated bias:  {head.bias.detach().tolist()}")
     train(
         trained, head, train_x, train_y,
         epochs=args.epochs, lr=args.lr,
         batch_size=args.batch_size, weight_decay=args.weight_decay,
     )
+    print("\n  recalibrating BN running stats from trained model...")
+    head.recalibrate_bn(trained, train_x)
     trained_acc, trained_cm = confusion(trained, head, test_x, test_y)
     print(f"\n  test accuracy: {trained_acc:.3f}")
     print_matrix(trained_cm)
