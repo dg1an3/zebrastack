@@ -153,21 +153,22 @@ def raw_responses(model, trial: Trial, init_orients) -> dict[str, float]:
     out = model(trial.image.unsqueeze(0).unsqueeze(0))
     cells = out["lie_cells"]  # (1, n_targets, H, W)
     target_names = list(model.lie_cells.targets)
-    norm = total_v4_energy(out["v4_power"]).clamp_min(1e-12)
-    responses = {
-        name: float(cells[0, idx].mean().item() / float(norm.mean().item()))
+    return {
+        name: float(cells[0, idx].mean().item())
         for idx, name in enumerate(target_names)
     }
-    responses["radial_dc"] = float(radial_dc_readout(out["v2_dc"], init_orients).item())
-    return responses
 
 
-def z_score(per_cell_values: dict[str, list[float]]) -> dict[str, tuple[float, float]]:
+def robust_stats(per_cell_values: dict[str, list[float]]) -> dict[str, tuple[float, float]]:
+    """Per-cell median and MAD (median absolute deviation), robust to outliers."""
     stats = {}
     for k, vs in per_cell_values.items():
-        m = sum(vs) / len(vs)
-        var = sum((v - m) ** 2 for v in vs) / len(vs)
-        stats[k] = (m, math.sqrt(max(var, 1e-12)))
+        sorted_vs = sorted(vs)
+        n = len(sorted_vs)
+        median = sorted_vs[n // 2]
+        deviations = sorted([abs(v - median) for v in vs])
+        mad = deviations[n // 2] * 1.4826
+        stats[k] = (median, max(mad, 1e-12))
     return stats
 
 
@@ -190,6 +191,8 @@ def main() -> int:
         recursive_kernel_size=41,
         use_v2_pooling=True,
         v2_sigma_to_period=2.0,
+        use_v4_dc_channel=False,
+        radial_subtracts_orthogonal=True,
     )
     model.eval()
 
@@ -210,13 +213,13 @@ def main() -> int:
     # because the V4 bandpass picks up the most energy from rings).
     response_keys = list(raw[0][1].keys())
     pooled = {k: [r[1][k] for r in raw] for k in response_keys}
-    stats = z_score(pooled)
+    stats = robust_stats(pooled)
 
     def classify(scores: dict[str, float]) -> tuple[str, dict[str, float]]:
-        z_concentric = (scores["concentric"] - stats["concentric"][0]) / stats["concentric"][1]
-        z_radial = (scores["radial_dc"] - stats["radial_dc"][0]) / stats["radial_dc"][1]
-        z_spiral = (scores["spiral"] - stats["spiral"][0]) / stats["spiral"][1]
-        scored = {"concentric": z_concentric, "radial": z_radial, "spiral": z_spiral}
+        scored = {}
+        for cell in ("concentric", "radial", "spiral"):
+            mean, std = stats[cell]
+            scored[cell] = (scores[cell] - mean) / max(std, 1e-12)
         return max(scored, key=scored.get), scored
 
     confusion = {true: {pred: 0 for pred in families} for true in families}

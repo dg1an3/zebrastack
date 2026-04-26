@@ -144,6 +144,98 @@ def _gaussian_kernel(size: int, sigma: float) -> torch.Tensor:
     return k / k.sum()
 
 
+def _oriented_gaussian_kernel(
+    size: int,
+    orientation: float,
+    sigma_long: float,
+    sigma_short: float,
+    surround_ratio: float = 0.0,
+) -> torch.Tensor:
+    """Anisotropic kernel elongated along ``orientation`` (the long axis).
+
+    With ``surround_ratio == 0`` this is a plain anisotropic Gaussian and
+    responds to any elongated bright region. With ``surround_ratio > 0`` a
+    wider perpendicular Gaussian is subtracted from the centre so the
+    kernel becomes an elongated centre-surround detector that rejects
+    adjacent parallel stripes -- the structural difference between a
+    radial "single segment" (no nearby parallel companions) and a
+    concentric "stripe in a stack" (companions on either side).
+    """
+    half = (size - 1) / 2.0
+    ys, xs = torch.meshgrid(
+        torch.arange(size, dtype=torch.float32) - half,
+        torch.arange(size, dtype=torch.float32) - half,
+        indexing="ij",
+    )
+    x_long = xs * math.cos(orientation) + ys * math.sin(orientation)
+    y_short = -xs * math.sin(orientation) + ys * math.cos(orientation)
+    long_env = torch.exp(-(x_long ** 2) / (2.0 * sigma_long ** 2))
+    centre = torch.exp(-(y_short ** 2) / (2.0 * sigma_short ** 2))
+    if surround_ratio > 0:
+        sigma_surround = sigma_short * (1.0 + surround_ratio)
+        surround = torch.exp(-(y_short ** 2) / (2.0 * sigma_surround ** 2))
+        centre = centre - surround * (sigma_short / sigma_surround)
+    k = long_env * centre
+    norm = k.abs().sum()
+    if norm > 0:
+        k = k / norm
+    return k
+
+
+class OrientedDCBank(nn.Module):
+    """Bank of oriented anisotropic Gaussians (frequency-zero "Gabors").
+
+    Each kernel is a Gaussian elongated along its preferred orientation.
+    When applied to a V1 power map, the response at orientation θ is large
+    where the V1 power has an elongated bright region oriented along θ —
+    i.e., a "single segment" detector. This is the channel a radial-
+    selective V4 cell needs in order to fire on the radial stimulus's
+    DC-envelope structure that bandpass recursive Gabors reject.
+    """
+
+    def __init__(
+        self,
+        orientations: Sequence[float],
+        sigma_long: float,
+        sigma_short: float,
+        size: int,
+        surround_ratio: float = 0.0,
+        rectify: bool = True,
+        square_output: bool = True,
+    ):
+        super().__init__()
+        self.orientations = tuple(orientations)
+        self.size = size
+        self.rectify = rectify
+        self.square_output = square_output
+        kernels = torch.stack(
+            [
+                _oriented_gaussian_kernel(
+                    size, theta, sigma_long, sigma_short, surround_ratio
+                )
+                for theta in orientations
+            ]
+        ).unsqueeze(1)
+        self.register_buffer("kernels", kernels)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        if x.dim() == 3:
+            x = x.unsqueeze(1)
+        if x.shape[1] != 1:
+            raise ValueError(
+                f"OrientedDCBank expects single-channel input, got {x.shape[1]}"
+            )
+        pad = self.size // 2
+        pad = min(pad, x.shape[-1] - 1, x.shape[-2] - 1)
+        x_padded = F.pad(x, (pad, pad, pad, pad), mode="reflect")
+        out = F.conv2d(x_padded, self.kernels, padding=self.size // 2 - pad)
+        if self.rectify:
+            out = F.relu(out)
+        if self.square_output:
+            out = out ** 2
+        return out
+
+
 class V2Mix(nn.Module):
     """1x1 Conv2d cross-channel mixing layer for V2.
 
@@ -225,6 +317,12 @@ class RecursiveFiltersV4(nn.Module):
         include_dc_channel: bool = True,
         use_v2_mixing: bool = False,
         trainable_v2_mix: bool = True,
+        use_v4_dc_channel: bool = True,
+        v4_dc_sigma_long: float = 16.0,
+        v4_dc_sigma_short_to_period: float = 0.5,
+        v4_dc_surround_ratio: float = 1.5,
+        v4_dc_from_v1: bool = True,
+        v4_dc_kernel_size: int | None = None,
     ):
         super().__init__()
         self.v1_spec = v1_spec
@@ -237,6 +335,8 @@ class RecursiveFiltersV4(nn.Module):
         self.use_v2_pooling = use_v2_pooling
         self.include_dc_channel = include_dc_channel
         self.use_v2_mixing = use_v2_mixing
+        self.use_v4_dc_channel = use_v4_dc_channel
+        self.v4_dc_from_v1 = v4_dc_from_v1
 
         if use_v2_pooling:
             self.v2_pool = nn.ModuleList(
@@ -274,6 +374,25 @@ class RecursiveFiltersV4(nn.Module):
         self.v4_banks = nn.ModuleList([b for b in v4_banks if b is not None])
         self.v4_freqs = v4_freqs
 
+        if use_v4_dc_channel:
+            dc_size = v4_dc_kernel_size or (int(round(6 * v4_dc_sigma_long)) | 1)
+            self.v4_dc_banks = nn.ModuleList()
+            for f in v1_spec.frequencies:
+                sigma_short = max(v4_dc_sigma_short_to_period / max(f, 1e-6), 1.0)
+                sigma_short = min(sigma_short, v4_dc_sigma_long * 0.5)
+                self.v4_dc_banks.append(
+                    OrientedDCBank(
+                        orientations=self.recursive_orientations,
+                        sigma_long=v4_dc_sigma_long,
+                        sigma_short=sigma_short,
+                        size=dc_size,
+                        surround_ratio=v4_dc_surround_ratio,
+                        rectify=True,
+                    )
+                )
+        else:
+            self.v4_dc_banks = None
+
     def forward(self, x: torch.Tensor) -> dict[str, torch.Tensor]:
         v1_power = self.v1(x)
         b, _, h, w = v1_power.shape
@@ -297,13 +416,23 @@ class RecursiveFiltersV4(nn.Module):
             v2_grouped = v2_flat.view(b, n_f, n_o, h, w)
 
         v4_per_freq: list[torch.Tensor] = []
+        n_ro = len(self.recursive_orientations)
         for f_idx, bank in enumerate(self.v4_banks):
             channels = v2_grouped[:, f_idx]
             channels_flat = channels.reshape(b * n_o, 1, h, w)
             recursive_power = bank(channels_flat)
             n_rf = len(self.v4_freqs[f_idx])
-            n_ro = len(self.recursive_orientations)
             recursive_power = recursive_power.view(b, n_o, n_rf, n_ro, h, w)
+
+            if self.v4_dc_banks is not None:
+                if self.v4_dc_from_v1:
+                    dc_input = v1_grouped[:, f_idx].reshape(b * n_o, 1, h, w)
+                else:
+                    dc_input = channels_flat
+                dc_response = self.v4_dc_banks[f_idx](dc_input)
+                dc_response = dc_response.view(b, n_o, 1, n_ro, h, w)
+                recursive_power = torch.cat([recursive_power, dc_response], dim=2)
+
             v4_per_freq.append(recursive_power)
 
         out = {
@@ -462,6 +591,9 @@ class LieGroupCells(nn.Module):
         recursive_orientations: Sequence[float],
         n_initial_frequencies: int,
         n_recursive_frequencies: int,
+        dc_slot_index: int | None = None,
+        radial_uses_dc_only: bool = False,
+        radial_subtracts_orthogonal: bool = True,
         square: bool = False,
         trainable: bool = False,
     ):
@@ -471,6 +603,9 @@ class LieGroupCells(nn.Module):
         self.recursive_orientations = tuple(recursive_orientations)
         self.n_initial_frequencies = n_initial_frequencies
         self.n_recursive_frequencies = n_recursive_frequencies
+        self.dc_slot_index = dc_slot_index
+        self.radial_uses_dc_only = radial_uses_dc_only
+        self.radial_subtracts_orthogonal = radial_subtracts_orthogonal
         self.square = square
 
         n_init_o = len(initial_orientations)
@@ -485,23 +620,63 @@ class LieGroupCells(nn.Module):
             if target not in _LIE_GROUP_DELTAS:
                 raise ValueError(f"Unknown target: {target}")
             deltas = _LIE_GROUP_DELTAS[target]
-            n_contrib = 0
+            is_radial = target == "radial"
+
+            pos_pairs: list[tuple[int, int]] = []
+            neg_pairs: list[tuple[int, int]] = []
+
             for delta in deltas:
                 for i, theta_i in enumerate(initial_orientations):
                     target_theta = (theta_i + delta) % math.pi
                     j = _closest_orient_index(target_theta, recursive_orientations)
-                    for fi in range(n_initial_frequencies):
-                        for rfi in range(n_recursive_frequencies):
-                            ch = (
-                                fi * (n_init_o * n_recursive_frequencies * n_rec_o)
-                                + i * (n_recursive_frequencies * n_rec_o)
-                                + rfi * n_rec_o
-                                + j
-                            )
-                            weight[t_idx, ch, 0, 0] = 1.0
-                            n_contrib += 1
-            if n_contrib > 0:
-                weight[t_idx] /= n_contrib
+                    pos_pairs.append((i, j))
+            if is_radial and radial_subtracts_orthogonal:
+                competing_deltas = [math.pi / 2, math.pi / 4, -math.pi / 4]
+                for cdelta in competing_deltas:
+                    for i, theta_i in enumerate(initial_orientations):
+                        comp_theta = (theta_i + cdelta) % math.pi
+                        k = _closest_orient_index(comp_theta, recursive_orientations)
+                        neg_pairs.append((i, k))
+
+            n_pos = 0
+            for i, j in pos_pairs:
+                for fi in range(n_initial_frequencies):
+                    for rfi in range(n_recursive_frequencies):
+                        is_dc_slot = (
+                            dc_slot_index is not None and rfi == dc_slot_index
+                        )
+                        if is_radial and radial_uses_dc_only and not is_dc_slot:
+                            continue
+                        if (not is_radial) and is_dc_slot:
+                            continue
+                        ch = (
+                            fi * (n_init_o * n_recursive_frequencies * n_rec_o)
+                            + i * (n_recursive_frequencies * n_rec_o)
+                            + rfi * n_rec_o
+                            + j
+                        )
+                        weight[t_idx, ch, 0, 0] = 1.0
+                        n_pos += 1
+            if n_pos > 0:
+                weight[t_idx] /= n_pos
+
+            n_neg = 0
+            for i, k in neg_pairs:
+                for fi in range(n_initial_frequencies):
+                    for rfi in range(n_recursive_frequencies):
+                        if dc_slot_index is not None and rfi == dc_slot_index:
+                            continue
+                        ch = (
+                            fi * (n_init_o * n_recursive_frequencies * n_rec_o)
+                            + i * (n_recursive_frequencies * n_rec_o)
+                            + rfi * n_rec_o
+                            + k
+                        )
+                        weight[t_idx, ch, 0, 0] = -1.0
+                        n_neg += 1
+            if n_neg > 0:
+                neg_mask = weight[t_idx] < 0
+                weight[t_idx][neg_mask] /= n_neg
 
         self.conv = nn.Conv2d(in_channels, n_targets, kernel_size=1, bias=False)
         with torch.no_grad():
@@ -565,6 +740,14 @@ class RecursiveFiltersV4WithReadout(nn.Module):
         v2_sigma_to_period: float = 1.0,
         use_v2_mixing: bool = False,
         trainable_v2_mix: bool = True,
+        use_v4_dc_channel: bool = True,
+        v4_dc_sigma_long: float = 16.0,
+        v4_dc_sigma_short_to_period: float = 0.5,
+        v4_dc_surround_ratio: float = 1.5,
+        v4_dc_from_v1: bool = True,
+        v4_dc_kernel_size: int | None = None,
+        radial_uses_dc_only: bool = False,
+        radial_subtracts_orthogonal: bool = True,
         square_lie_cells: bool = False,
         trainable_lie_cells: bool = False,
     ):
@@ -578,13 +761,24 @@ class RecursiveFiltersV4WithReadout(nn.Module):
             v2_sigma_to_period=v2_sigma_to_period,
             use_v2_mixing=use_v2_mixing,
             trainable_v2_mix=trainable_v2_mix,
+            use_v4_dc_channel=use_v4_dc_channel,
+            v4_dc_sigma_long=v4_dc_sigma_long,
+            v4_dc_sigma_short_to_period=v4_dc_sigma_short_to_period,
+            v4_dc_surround_ratio=v4_dc_surround_ratio,
+            v4_dc_from_v1=v4_dc_from_v1,
+            v4_dc_kernel_size=v4_dc_kernel_size,
         )
+        n_recursive_frequencies = recursive_octaves + (1 if use_v4_dc_channel else 0)
+        dc_slot_index = recursive_octaves if use_v4_dc_channel else None
         self.lie_cells = LieGroupCells(
             targets=targets,
             initial_orientations=v1_spec.orientations,
             recursive_orientations=self.backbone.recursive_orientations,
             n_initial_frequencies=v1_spec.n_frequencies,
-            n_recursive_frequencies=recursive_octaves,
+            n_recursive_frequencies=n_recursive_frequencies,
+            dc_slot_index=dc_slot_index,
+            radial_uses_dc_only=radial_uses_dc_only,
+            radial_subtracts_orthogonal=radial_subtracts_orthogonal,
             square=square_lie_cells,
             trainable=trainable_lie_cells,
         )
