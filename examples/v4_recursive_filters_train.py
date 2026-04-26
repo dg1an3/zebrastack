@@ -98,19 +98,24 @@ class ReadoutHead(nn.Module):
 
     @torch.no_grad()
     def calibrate(self, backbone, calibration_x: torch.Tensor, batch_size: int = 16):
-        """Set scale = 1 / |mean cell activation| from a forward pass."""
+        """Standardize each cell to zero mean, unit std on calibration data.
+
+        Equivalent to batch-normalizing once with fixed statistics, then
+        freezing. ``bias`` absorbs the mean (so logits start centered) and
+        ``scale`` is set to 1 / std (so logits start with unit spread).
+        Both remain learnable.
+        """
         backbone.eval()
-        accum = torch.zeros(self.scale.shape[0])
-        n = 0
+        all_pooled = []
         for i in range(0, calibration_x.shape[0], batch_size):
             x = calibration_x[i:i+batch_size]
             cells = backbone(x)["lie_cells"]
-            pooled = cells.mean(dim=(-1, -2))
-            accum = accum + pooled.abs().sum(dim=0)
-            n += pooled.shape[0]
-        magnitudes = (accum / max(n, 1)).clamp_min(1e-12)
-        self.scale.data.copy_(1.0 / magnitudes)
-        self.bias.data.zero_()
+            all_pooled.append(cells.mean(dim=(-1, -2)))
+        all_pooled = torch.cat(all_pooled, dim=0)
+        mean = all_pooled.mean(dim=0)
+        std = all_pooled.std(dim=0).clamp_min(1e-12)
+        self.scale.data.copy_(1.0 / std)
+        self.bias.data.copy_(-mean / std)
 
     def forward(self, cells: torch.Tensor) -> torch.Tensor:
         pooled = cells.mean(dim=(-1, -2))
@@ -153,7 +158,7 @@ def main() -> int:
     parser.add_argument("--n-train", type=int, default=80)
     parser.add_argument("--n-test", type=int, default=30)
     parser.add_argument("--epochs", type=int, default=12)
-    parser.add_argument("--lr", type=float, default=0.05)
+    parser.add_argument("--lr", type=float, default=0.01)
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--weight-decay", type=float, default=1e-4)
     parser.add_argument("--train-v2", action="store_true",
@@ -206,7 +211,8 @@ def main() -> int:
     )
     head = ReadoutHead(len(CLASS_NAMES))
     head.calibrate(trained, train_x)
-    print(f"  calibrated per-class scale: {head.scale.detach().tolist()}")
+    print(f"  calibrated scale: {head.scale.detach().tolist()}")
+    print(f"  calibrated bias:  {head.bias.detach().tolist()}")
     train(
         trained, head, train_x, train_y,
         epochs=args.epochs, lr=args.lr,
