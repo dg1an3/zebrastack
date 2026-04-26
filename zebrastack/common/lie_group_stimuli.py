@@ -107,3 +107,51 @@ def plaid_stimulus(size: int = 128, frequency: float = 0.1) -> torch.Tensor:
     xs, ys = _grid(size)
     image = torch.cos(2.0 * math.pi * frequency * xs) + torch.cos(2.0 * math.pi * frequency * ys)
     return image * _aperture(size)
+
+
+def modulated_gabor_stimulus(
+    size: int = 128,
+    carrier_frequency: float = 0.18,
+    envelope: str = "concentric",
+    envelope_frequency: float = 0.04,
+    n_spokes: int | None = None,
+    sign: int = 1,
+    phase: float = 0.0,
+) -> torch.Tensor:
+    """High-frequency oriented carrier modulated by a low-frequency polar envelope.
+
+    Implements the construction described in Lane (1995, p. 5):
+        "stimuli created by amplitude modulating Gabor functions with lower
+         spatial frequency Gabor functions."
+
+    The carrier is a sinusoidal grating with orientation perpendicular to
+    the local stripe of the envelope (so the carrier rides along the
+    contour). The envelope determines the macro-scale Lie-group structure
+    (concentric, radial, spiral). Setting envelope_frequency to 0 produces
+    a uniform-envelope stimulus; setting carrier_frequency = envelope
+    frequency reduces to the simple polar grating.
+    """
+    xs, ys = _grid(size)
+    r = torch.sqrt(xs ** 2 + ys ** 2)
+    theta = torch.atan2(ys, xs)
+
+    if envelope == "concentric":
+        env = torch.cos(2.0 * math.pi * envelope_frequency * r + phase)
+        carrier_phase = 2.0 * math.pi * carrier_frequency * r
+    elif envelope == "radial":
+        n = n_spokes if n_spokes is not None else max(2, int(round(envelope_frequency * 2 * math.pi * 30)))
+        env = torch.cos(n * theta + phase)
+        carrier_arg = -theta
+        carrier_phase = 2.0 * math.pi * carrier_frequency * (
+            xs * torch.cos(carrier_arg) + ys * torch.sin(carrier_arg)
+        )
+    elif envelope == "spiral":
+        n = n_spokes if n_spokes is not None else 8
+        env = torch.cos(2.0 * math.pi * envelope_frequency * r + sign * n * theta + phase)
+        carrier_phase = 2.0 * math.pi * carrier_frequency * r
+    else:
+        raise ValueError(f"Unknown envelope: {envelope}")
+
+    carrier = torch.cos(carrier_phase)
+    image = env * carrier
+    return image * _aperture(size)

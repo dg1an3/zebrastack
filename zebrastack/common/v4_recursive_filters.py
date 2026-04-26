@@ -144,6 +144,31 @@ def _gaussian_kernel(size: int, sigma: float) -> torch.Tensor:
     return k / k.sum()
 
 
+class V2Mix(nn.Module):
+    """1x1 Conv2d cross-channel mixing layer for V2.
+
+    Operates on the flattened V2 output (channels = n_init_freq * n_orient)
+    and produces the same number of channels by default, so V4 can consume
+    its output unchanged. Identity-initialized; set ``trainable=True`` to
+    let gradient descent discover useful linear combinations of V1 power
+    maps (e.g. orientation-invariant energy channels, orientation-contrast
+    channels, cross-frequency channels).
+    """
+
+    def __init__(self, n_channels: int, trainable: bool = True):
+        super().__init__()
+        self.conv = nn.Conv2d(n_channels, n_channels, kernel_size=1, bias=False)
+        with torch.no_grad():
+            self.conv.weight.zero_()
+            for c in range(n_channels):
+                self.conv.weight[c, c, 0, 0] = 1.0
+        if not trainable:
+            self.conv.weight.requires_grad_(False)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.conv(x)
+
+
 class V2Pool(nn.Module):
     """Per-channel Gaussian spatial pooling.
 
@@ -198,6 +223,8 @@ class RecursiveFiltersV4(nn.Module):
         use_v2_pooling: bool = True,
         v2_sigma_to_period: float = 1.0,
         include_dc_channel: bool = True,
+        use_v2_mixing: bool = False,
+        trainable_v2_mix: bool = True,
     ):
         super().__init__()
         self.v1_spec = v1_spec
@@ -209,6 +236,7 @@ class RecursiveFiltersV4(nn.Module):
         self.recursive_octaves = recursive_octaves
         self.use_v2_pooling = use_v2_pooling
         self.include_dc_channel = include_dc_channel
+        self.use_v2_mixing = use_v2_mixing
 
         if use_v2_pooling:
             self.v2_pool = nn.ModuleList(
@@ -216,6 +244,12 @@ class RecursiveFiltersV4(nn.Module):
             )
         else:
             self.v2_pool = None
+
+        if use_v2_mixing:
+            n_v2_channels = v1_spec.n_frequencies * v1_spec.n_orientations
+            self.v2_mix = V2Mix(n_v2_channels, trainable=trainable_v2_mix)
+        else:
+            self.v2_mix = None
 
         ks = recursive_kernel_size or (v1_spec.kernel_size * (1 << recursive_octaves))
         self.recursive_kernel_size = ks
@@ -256,6 +290,11 @@ class RecursiveFiltersV4(nn.Module):
             v2_grouped = torch.stack(pooled, dim=1)
         else:
             v2_grouped = v1_grouped
+
+        if self.v2_mix is not None:
+            v2_flat = v2_grouped.reshape(b, n_f * n_o, h, w)
+            v2_flat = self.v2_mix(v2_flat)
+            v2_grouped = v2_flat.view(b, n_f, n_o, h, w)
 
         v4_per_freq: list[torch.Tensor] = []
         for f_idx, bank in enumerate(self.v4_banks):
@@ -387,6 +426,173 @@ def total_v4_energy(v4_per_freq: Sequence[torch.Tensor]) -> torch.Tensor:
     if total is None or n == 0:
         raise ValueError("v4_per_freq is empty.")
     return total / n
+
+
+class LieGroupCells(nn.Module):
+    """Lie-group selective V4 cells implemented as a 1x1 Conv2d.
+
+    The recursive-filters V4 stage produces maps indexed by
+    (initial_freq, initial_orient, recursive_freq, recursive_orient). A
+    Lie-group selective cell is a linear combination of those maps at each
+    pixel: pick (init_orient, recursive_orient) pairs whose orientation
+    difference Δθ matches the cell's preferred symmetry, sum them, and
+    optionally square the result.
+
+        Δθ = 0           radial cells       (parallel)
+        Δθ = π/2         concentric cells   (orthogonal)
+        Δθ = ±π/4        spiral cells       (oblique)
+
+    Since the readout is a per-pixel linear projection over channels, it is
+    exactly a 1x1 Conv2d. The weights are initialized from the
+    orientation-matching pattern so the layer reproduces the analytic
+    readout out of the box; setting ``trainable=True`` lets gradient
+    descent refine them. ``square=True`` adds a power transform consistent
+    with the V1 → V4 squaring pipeline.
+
+    The expected input is the ``v4_power`` list returned by
+    ``RecursiveFiltersV4``; the layer flattens it into a single
+    (B, C, H, W) tensor and applies the conv. ``forward_flat`` accepts the
+    pre-flattened tensor for use in pure-tensor pipelines.
+    """
+
+    def __init__(
+        self,
+        targets: Sequence[str],
+        initial_orientations: Sequence[float],
+        recursive_orientations: Sequence[float],
+        n_initial_frequencies: int,
+        n_recursive_frequencies: int,
+        square: bool = False,
+        trainable: bool = False,
+    ):
+        super().__init__()
+        self.targets = tuple(targets)
+        self.initial_orientations = tuple(initial_orientations)
+        self.recursive_orientations = tuple(recursive_orientations)
+        self.n_initial_frequencies = n_initial_frequencies
+        self.n_recursive_frequencies = n_recursive_frequencies
+        self.square = square
+
+        n_init_o = len(initial_orientations)
+        n_rec_o = len(recursive_orientations)
+        in_channels = (
+            n_initial_frequencies * n_init_o * n_recursive_frequencies * n_rec_o
+        )
+        n_targets = len(self.targets)
+
+        weight = torch.zeros(n_targets, in_channels, 1, 1)
+        for t_idx, target in enumerate(self.targets):
+            if target not in _LIE_GROUP_DELTAS:
+                raise ValueError(f"Unknown target: {target}")
+            deltas = _LIE_GROUP_DELTAS[target]
+            n_contrib = 0
+            for delta in deltas:
+                for i, theta_i in enumerate(initial_orientations):
+                    target_theta = (theta_i + delta) % math.pi
+                    j = _closest_orient_index(target_theta, recursive_orientations)
+                    for fi in range(n_initial_frequencies):
+                        for rfi in range(n_recursive_frequencies):
+                            ch = (
+                                fi * (n_init_o * n_recursive_frequencies * n_rec_o)
+                                + i * (n_recursive_frequencies * n_rec_o)
+                                + rfi * n_rec_o
+                                + j
+                            )
+                            weight[t_idx, ch, 0, 0] = 1.0
+                            n_contrib += 1
+            if n_contrib > 0:
+                weight[t_idx] /= n_contrib
+
+        self.conv = nn.Conv2d(in_channels, n_targets, kernel_size=1, bias=False)
+        with torch.no_grad():
+            self.conv.weight.copy_(weight)
+        if not trainable:
+            self.conv.weight.requires_grad_(False)
+
+    def flatten_v4(self, v4_per_freq: Sequence[torch.Tensor]) -> torch.Tensor:
+        """Flatten the per-frequency V4 list into a single (B, C, H, W) tensor.
+
+        Channel order matches the conv weights:
+            (init_freq, init_orient, recursive_freq, recursive_orient).
+        """
+        if len(v4_per_freq) != self.n_initial_frequencies:
+            raise ValueError(
+                f"Expected {self.n_initial_frequencies} init-freq blocks, "
+                f"got {len(v4_per_freq)}"
+            )
+        flat_blocks = []
+        for block in v4_per_freq:
+            b, n_init, n_rf, n_ro, h, w = block.shape
+            if n_rf != self.n_recursive_frequencies:
+                raise ValueError(
+                    f"Block recursive_freq={n_rf} does not match "
+                    f"n_recursive_frequencies={self.n_recursive_frequencies}"
+                )
+            flat_blocks.append(block.reshape(b, n_init * n_rf * n_ro, h, w))
+        return torch.cat(flat_blocks, dim=1)
+
+    def forward(self, v4_per_freq: Sequence[torch.Tensor]) -> torch.Tensor:
+        """Returns (B, n_targets, H, W)."""
+        flat = self.flatten_v4(v4_per_freq)
+        return self.forward_flat(flat)
+
+    def forward_flat(self, v4_flat: torch.Tensor) -> torch.Tensor:
+        out = self.conv(v4_flat)
+        if self.square:
+            out = out ** 2
+        return out
+
+    def cell_index(self, target: str) -> int:
+        return self.targets.index(target)
+
+
+class RecursiveFiltersV4WithReadout(nn.Module):
+    """RecursiveFiltersV4 with a built-in LieGroupCells readout layer.
+
+    Wraps RecursiveFiltersV4 and a LieGroupCells module into a single
+    end-to-end forward pass. ``forward`` returns a dict containing the
+    intermediate activations and the per-cell maps under ``"lie_cells"``.
+    """
+
+    def __init__(
+        self,
+        v1_spec: FilterBankSpec,
+        targets: Sequence[str] = ("radial", "concentric", "spiral"),
+        recursive_orientations: Sequence[float] | None = None,
+        recursive_octaves: int = 2,
+        recursive_kernel_size: int | None = None,
+        use_v2_pooling: bool = True,
+        v2_sigma_to_period: float = 1.0,
+        use_v2_mixing: bool = False,
+        trainable_v2_mix: bool = True,
+        square_lie_cells: bool = False,
+        trainable_lie_cells: bool = False,
+    ):
+        super().__init__()
+        self.backbone = RecursiveFiltersV4(
+            v1_spec=v1_spec,
+            recursive_orientations=recursive_orientations,
+            recursive_octaves=recursive_octaves,
+            recursive_kernel_size=recursive_kernel_size,
+            use_v2_pooling=use_v2_pooling,
+            v2_sigma_to_period=v2_sigma_to_period,
+            use_v2_mixing=use_v2_mixing,
+            trainable_v2_mix=trainable_v2_mix,
+        )
+        self.lie_cells = LieGroupCells(
+            targets=targets,
+            initial_orientations=v1_spec.orientations,
+            recursive_orientations=self.backbone.recursive_orientations,
+            n_initial_frequencies=v1_spec.n_frequencies,
+            n_recursive_frequencies=recursive_octaves,
+            square=square_lie_cells,
+            trainable=trainable_lie_cells,
+        )
+
+    def forward(self, x: torch.Tensor) -> dict:
+        out = self.backbone(x)
+        out["lie_cells"] = self.lie_cells(out["v4_power"])
+        return out
 
 
 def standard_orientations(n: int) -> tuple[float, ...]:
