@@ -82,20 +82,21 @@ def print_matrix(matrix):
 
 
 class ReadoutHead(nn.Module):
-    """Spatial pool + BatchNorm + per-class affine on top of LieGroupCells.
+    """Spatial pool + LayerNorm + per-class affine on top of LieGroupCells.
 
-    BatchNorm normalizes each cell's logit distribution so the cross-entropy
-    gradient isn't drowned out by the cells having different absolute
-    magnitudes. The affine layer adds learnable per-class scale/bias.
+    LayerNorm balances the per-example class logits without relying on
+    running statistics (which BatchNorm needs and which were unstable
+    here at small batch sizes). The learnable affine adds per-class
+    scale and bias so the model can express any final linear mapping.
     """
 
     def __init__(self, n_classes: int):
         super().__init__()
-        self.bn = nn.BatchNorm1d(n_classes)
+        self.norm = nn.LayerNorm(n_classes)
 
     def forward(self, cells: torch.Tensor) -> torch.Tensor:
         pooled = cells.mean(dim=(-1, -2))
-        return self.bn(pooled)
+        return self.norm(pooled)
 
 
 def train(backbone_model, head, train_x, train_y, epochs, lr, batch_size, weight_decay):
