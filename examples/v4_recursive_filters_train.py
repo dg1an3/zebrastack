@@ -82,21 +82,39 @@ def print_matrix(matrix):
 
 
 class ReadoutHead(nn.Module):
-    """Spatial pool + LayerNorm + per-class affine on top of LieGroupCells.
+    """Spatial pool + calibrated per-class scale + learnable bias.
 
-    LayerNorm balances the per-example class logits without relying on
-    running statistics (which BatchNorm needs and which were unstable
-    here at small batch sizes). The learnable affine adds per-class
-    scale and bias so the model can express any final linear mapping.
+    Per-class scale is initialized to 1 / (mean cell activation observed
+    on a calibration set) so the three logits start on a comparable
+    magnitude and softmax doesn't saturate. Both scale and bias are
+    learnable. No running statistics, robust at eval time, and unlike
+    LayerNorm the network can grow logit spread to lower the loss.
     """
 
     def __init__(self, n_classes: int):
         super().__init__()
-        self.norm = nn.LayerNorm(n_classes)
+        self.scale = nn.Parameter(torch.ones(n_classes))
+        self.bias = nn.Parameter(torch.zeros(n_classes))
+
+    @torch.no_grad()
+    def calibrate(self, backbone, calibration_x: torch.Tensor, batch_size: int = 16):
+        """Set scale = 1 / |mean cell activation| from a forward pass."""
+        backbone.eval()
+        accum = torch.zeros(self.scale.shape[0])
+        n = 0
+        for i in range(0, calibration_x.shape[0], batch_size):
+            x = calibration_x[i:i+batch_size]
+            cells = backbone(x)["lie_cells"]
+            pooled = cells.mean(dim=(-1, -2))
+            accum = accum + pooled.abs().sum(dim=0)
+            n += pooled.shape[0]
+        magnitudes = (accum / max(n, 1)).clamp_min(1e-12)
+        self.scale.data.copy_(1.0 / magnitudes)
+        self.bias.data.zero_()
 
     def forward(self, cells: torch.Tensor) -> torch.Tensor:
         pooled = cells.mean(dim=(-1, -2))
-        return self.norm(pooled)
+        return self.scale * pooled + self.bias
 
 
 def train(backbone_model, head, train_x, train_y, epochs, lr, batch_size, weight_decay):
@@ -187,6 +205,8 @@ def main() -> int:
         trainable_lie_cells=True,
     )
     head = ReadoutHead(len(CLASS_NAMES))
+    head.calibrate(trained, train_x)
+    print(f"  calibrated per-class scale: {head.scale.detach().tolist()}")
     train(
         trained, head, train_x, train_y,
         epochs=args.epochs, lr=args.lr,
