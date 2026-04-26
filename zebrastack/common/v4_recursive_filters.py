@@ -685,6 +685,8 @@ class LieGroupCells(nn.Module):
         square: bool = False,
         trainable: bool = False,
         n_extra_channels: int = 0,
+        v2_gabor_orientations: Sequence[float] | None = None,
+        v2_gabor_n_frequencies: int = 0,
     ):
         super().__init__()
         self.targets = tuple(targets)
@@ -697,6 +699,10 @@ class LieGroupCells(nn.Module):
         self.radial_subtracts_orthogonal = radial_subtracts_orthogonal
         self.square = square
         self.n_extra_channels = n_extra_channels
+        self.v2_gabor_orientations = (
+            tuple(v2_gabor_orientations) if v2_gabor_orientations is not None else None
+        )
+        self.v2_gabor_n_frequencies = v2_gabor_n_frequencies
 
         n_init_o = len(initial_orientations)
         n_rec_o = len(recursive_orientations)
@@ -705,6 +711,15 @@ class LieGroupCells(nn.Module):
         )
         in_channels = v4_channels + n_extra_channels
         n_targets = len(self.targets)
+
+        n_v2_o = len(self.v2_gabor_orientations) if self.v2_gabor_orientations else 0
+        n_v2_f = v2_gabor_n_frequencies
+        v2_channels_expected = (
+            n_initial_frequencies * n_init_o * n_v2_f * n_v2_o
+        )
+        v2_init_active = (
+            n_v2_o > 0 and n_v2_f > 0 and v2_channels_expected == n_extra_channels
+        )
 
         weight = torch.zeros(n_targets, in_channels, 1, 1)
         for t_idx, target in enumerate(self.targets):
@@ -768,6 +783,59 @@ class LieGroupCells(nn.Module):
             if n_neg > 0:
                 neg_mask = weight[t_idx] < 0
                 weight[t_idx][neg_mask] /= n_neg
+
+            if v2_init_active:
+                v2_pos: list[tuple[int, int]] = []
+                v2_neg: list[tuple[int, int]] = []
+                for delta in deltas:
+                    for i, theta_i in enumerate(initial_orientations):
+                        target_theta = (theta_i + delta) % math.pi
+                        j = _closest_orient_index(target_theta, self.v2_gabor_orientations)
+                        v2_pos.append((i, j))
+                if is_radial and radial_subtracts_orthogonal:
+                    competing = [math.pi / 2, math.pi / 4, -math.pi / 4]
+                    for cdelta in competing:
+                        for i, theta_i in enumerate(initial_orientations):
+                            comp_theta = (theta_i + cdelta) % math.pi
+                            k = _closest_orient_index(comp_theta, self.v2_gabor_orientations)
+                            v2_neg.append((i, k))
+
+                v2_n_pos = 0
+                for i, j in v2_pos:
+                    for fi in range(n_initial_frequencies):
+                        for v2fi in range(n_v2_f):
+                            v2_local = (
+                                fi * (n_init_o * n_v2_f * n_v2_o)
+                                + i * (n_v2_f * n_v2_o)
+                                + v2fi * n_v2_o
+                                + j
+                            )
+                            ch = v4_channels + v2_local
+                            weight[t_idx, ch, 0, 0] = 1.0
+                            v2_n_pos += 1
+                if v2_n_pos > 0:
+                    v2_slice = weight[t_idx, v4_channels:, 0, 0]
+                    pos_mask = v2_slice > 0
+                    v2_slice[pos_mask] = v2_slice[pos_mask] / v2_n_pos
+
+                v2_n_neg = 0
+                for i, k in v2_neg:
+                    for fi in range(n_initial_frequencies):
+                        for v2fi in range(n_v2_f):
+                            v2_local = (
+                                fi * (n_init_o * n_v2_f * n_v2_o)
+                                + i * (n_v2_f * n_v2_o)
+                                + v2fi * n_v2_o
+                                + k
+                            )
+                            ch = v4_channels + v2_local
+                            if weight[t_idx, ch, 0, 0] == 0.0:
+                                weight[t_idx, ch, 0, 0] = -1.0
+                                v2_n_neg += 1
+                if v2_n_neg > 0:
+                    v2_slice = weight[t_idx, v4_channels:, 0, 0]
+                    neg_mask = v2_slice < 0
+                    v2_slice[neg_mask] = v2_slice[neg_mask] / v2_n_neg
 
         self.conv = nn.Conv2d(in_channels, n_targets, kernel_size=1, bias=True)
         with torch.no_grad():
@@ -889,6 +957,12 @@ class RecursiveFiltersV4WithReadout(nn.Module):
         n_extra = (
             self.backbone.v2_gabor.n_outputs if self.backbone.v2_gabor is not None else 0
         )
+        v2_g_orientations = (
+            self.backbone.v2_gabor.spec.orientations if self.backbone.v2_gabor is not None else None
+        )
+        v2_g_n_freqs = (
+            self.backbone.v2_gabor.spec.n_frequencies if self.backbone.v2_gabor is not None else 0
+        )
         self.lie_cells = LieGroupCells(
             targets=targets,
             initial_orientations=v1_spec.orientations,
@@ -901,6 +975,8 @@ class RecursiveFiltersV4WithReadout(nn.Module):
             square=square_lie_cells,
             trainable=trainable_lie_cells,
             n_extra_channels=n_extra,
+            v2_gabor_orientations=v2_g_orientations,
+            v2_gabor_n_frequencies=v2_g_n_freqs,
         )
 
     def forward(self, x: torch.Tensor) -> dict:
