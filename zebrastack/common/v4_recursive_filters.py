@@ -678,11 +678,13 @@ class LieGroupCells(nn.Module):
                 neg_mask = weight[t_idx] < 0
                 weight[t_idx][neg_mask] /= n_neg
 
-        self.conv = nn.Conv2d(in_channels, n_targets, kernel_size=1, bias=False)
+        self.conv = nn.Conv2d(in_channels, n_targets, kernel_size=1, bias=True)
         with torch.no_grad():
             self.conv.weight.copy_(weight)
+            self.conv.bias.zero_()
         if not trainable:
             self.conv.weight.requires_grad_(False)
+            self.conv.bias.requires_grad_(False)
 
     def flatten_v4(self, v4_per_freq: Sequence[torch.Tensor]) -> torch.Tensor:
         """Flatten the per-frequency V4 list into a single (B, C, H, W) tensor.

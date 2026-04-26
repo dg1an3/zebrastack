@@ -109,6 +109,54 @@ def plaid_stimulus(size: int = 128, frequency: float = 0.1) -> torch.Tensor:
     return image * _aperture(size)
 
 
+def random_concentric(size: int, rng: torch.Generator) -> torch.Tensor:
+    """Random concentric stimulus: polar grating or modulated Gabor."""
+    use_modulated = bool(torch.rand(1, generator=rng).item() < 0.5)
+    if use_modulated:
+        carrier = float(torch.empty(1).uniform_(0.14, 0.24, generator=rng).item())
+        env = float(torch.empty(1).uniform_(0.03, 0.08, generator=rng).item())
+        phase = float(torch.empty(1).uniform_(0.0, 2 * math.pi, generator=rng).item())
+        return modulated_gabor_stimulus(
+            size, carrier_frequency=carrier, envelope="concentric",
+            envelope_frequency=env, phase=phase,
+        )
+    f = float(torch.empty(1).uniform_(0.06, 0.20, generator=rng).item())
+    return concentric_stimulus(size, frequency=f)
+
+
+def random_radial(size: int, rng: torch.Generator) -> torch.Tensor:
+    """Random radial stimulus: annular spokes or modulated Gabor."""
+    use_modulated = bool(torch.rand(1, generator=rng).item() < 0.5)
+    if use_modulated:
+        carrier = float(torch.empty(1).uniform_(0.14, 0.24, generator=rng).item())
+        env = float(torch.empty(1).uniform_(0.03, 0.08, generator=rng).item())
+        phase = float(torch.empty(1).uniform_(0.0, 2 * math.pi, generator=rng).item())
+        return modulated_gabor_stimulus(
+            size, carrier_frequency=carrier, envelope="radial",
+            envelope_frequency=env, phase=phase,
+        )
+    f = float(torch.empty(1).uniform_(0.06, 0.20, generator=rng).item())
+    return annular_radial_stimulus(size, target_frequency=f)
+
+
+def random_spiral(size: int, rng: torch.Generator) -> torch.Tensor:
+    """Random spiral stimulus: polar grating or modulated Gabor, random sign."""
+    sign = 1 if bool(torch.rand(1, generator=rng).item() < 0.5) else -1
+    use_modulated = bool(torch.rand(1, generator=rng).item() < 0.5)
+    if use_modulated:
+        carrier = float(torch.empty(1).uniform_(0.14, 0.24, generator=rng).item())
+        env = float(torch.empty(1).uniform_(0.03, 0.08, generator=rng).item())
+        n = int(torch.randint(6, 14, (1,), generator=rng).item())
+        phase = float(torch.empty(1).uniform_(0.0, 2 * math.pi, generator=rng).item())
+        return modulated_gabor_stimulus(
+            size, carrier_frequency=carrier, envelope="spiral",
+            envelope_frequency=env, n_spokes=n, sign=sign, phase=phase,
+        )
+    f = float(torch.empty(1).uniform_(0.06, 0.20, generator=rng).item())
+    n = int(torch.randint(6, 14, (1,), generator=rng).item())
+    return spiral_stimulus(size, frequency=f, n_spokes=n, sign=sign)
+
+
 def modulated_gabor_stimulus(
     size: int = 128,
     carrier_frequency: float = 0.18,
