@@ -261,6 +261,62 @@ class V2Mix(nn.Module):
         return self.conv(x)
 
 
+class V2GaborStage(nn.Module):
+    """V2-scale oriented Gabor filtering of V1 power maps.
+
+    Conceptually this is a copy of the V1 Gabor + power pipeline applied
+    one level up: each V1 oriented power map (one per V1 init_freq x
+    init_orient channel) is treated as a new "image", and a Gabor power
+    bank at V2 scale is applied to it. The output is a set of V2
+    oriented features at coarser spatial scale than V1.
+
+    Output shape: (B, n_input_channels * n_v2_freq * n_v2_orient, H, W).
+
+    These features feed the LieGroupCells readout alongside the V4
+    bandpass and V4 DC channels, giving V4 access to a richer set of
+    intermediate-scale oriented features (corner / curvature /
+    angle-tuned cells in the V2 interstripe pathway).
+    """
+
+    def __init__(
+        self,
+        n_input_channels: int,
+        v2_orientations: Sequence[float],
+        v2_frequencies: Sequence[float],
+        kernel_size: int,
+        sigma_to_period: float = 0.5,
+    ):
+        super().__init__()
+        self.n_input_channels = n_input_channels
+        spec = FilterBankSpec(
+            orientations=tuple(v2_orientations),
+            frequencies=tuple(v2_frequencies),
+            kernel_size=kernel_size,
+            sigma_to_period=sigma_to_period,
+        )
+        self.spec = spec
+        self.bank = GaborPowerBank(spec)
+
+    @property
+    def n_outputs_per_input(self) -> int:
+        return self.bank.n_outputs
+
+    @property
+    def n_outputs(self) -> int:
+        return self.n_input_channels * self.bank.n_outputs
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        b, c, h, w = x.shape
+        if c != self.n_input_channels:
+            raise ValueError(
+                f"V2GaborStage expected {self.n_input_channels} input channels, "
+                f"got {c}"
+            )
+        x_flat = x.reshape(b * c, 1, h, w)
+        out = self.bank(x_flat)
+        return out.view(b, c * self.bank.n_outputs, h, w)
+
+
 class V2Pool(nn.Module):
     """Per-channel Gaussian spatial pooling.
 
@@ -323,6 +379,11 @@ class RecursiveFiltersV4(nn.Module):
         v4_dc_surround_ratio: float = 1.5,
         v4_dc_from_v1: bool = True,
         v4_dc_kernel_size: int | None = None,
+        use_v2_gabor: bool = False,
+        v2_gabor_orientations: Sequence[float] | None = None,
+        v2_gabor_frequencies: Sequence[float] | None = None,
+        v2_gabor_kernel_size: int = 33,
+        v2_gabor_sigma_to_period: float = 0.5,
     ):
         super().__init__()
         self.v1_spec = v1_spec
@@ -337,6 +398,7 @@ class RecursiveFiltersV4(nn.Module):
         self.use_v2_mixing = use_v2_mixing
         self.use_v4_dc_channel = use_v4_dc_channel
         self.v4_dc_from_v1 = v4_dc_from_v1
+        self.use_v2_gabor = use_v2_gabor
 
         if use_v2_pooling:
             self.v2_pool = nn.ModuleList(
@@ -373,6 +435,25 @@ class RecursiveFiltersV4(nn.Module):
             v4_banks.append(GaborPowerBank(spec_r))
         self.v4_banks = nn.ModuleList([b for b in v4_banks if b is not None])
         self.v4_freqs = v4_freqs
+
+        if use_v2_gabor:
+            n_v2_in = v1_spec.n_frequencies * v1_spec.n_orientations
+            v2_orients = (
+                tuple(v2_gabor_orientations)
+                if v2_gabor_orientations is not None
+                else tuple(self.recursive_orientations)
+            )
+            if v2_gabor_frequencies is None:
+                v2_gabor_frequencies = tuple(f / 2.0 for f in v1_spec.frequencies[:2])
+            self.v2_gabor = V2GaborStage(
+                n_input_channels=n_v2_in,
+                v2_orientations=v2_orients,
+                v2_frequencies=tuple(v2_gabor_frequencies),
+                kernel_size=v2_gabor_kernel_size,
+                sigma_to_period=v2_gabor_sigma_to_period,
+            )
+        else:
+            self.v2_gabor = None
 
         if use_v4_dc_channel:
             dc_size = v4_dc_kernel_size or (int(round(6 * v4_dc_sigma_long)) | 1)
@@ -435,11 +516,18 @@ class RecursiveFiltersV4(nn.Module):
 
             v4_per_freq.append(recursive_power)
 
+        v2_gabor_power: torch.Tensor | None = None
+        if self.v2_gabor is not None:
+            v2_input = v2_grouped.reshape(b, n_f * n_o, h, w)
+            v2_gabor_power = self.v2_gabor(v2_input)
+
         out = {
             "v1_power": v1_grouped,
             "v2_pooled": v2_grouped,
             "v4_power": v4_per_freq,
         }
+        if v2_gabor_power is not None:
+            out["v2_gabor"] = v2_gabor_power
         if self.include_dc_channel:
             out["v2_dc"] = v2_grouped
         return out
@@ -596,6 +684,9 @@ class LieGroupCells(nn.Module):
         radial_subtracts_orthogonal: bool = True,
         square: bool = False,
         trainable: bool = False,
+        n_extra_channels: int = 0,
+        v2_gabor_orientations: Sequence[float] | None = None,
+        v2_gabor_n_frequencies: int = 0,
     ):
         super().__init__()
         self.targets = tuple(targets)
@@ -607,13 +698,28 @@ class LieGroupCells(nn.Module):
         self.radial_uses_dc_only = radial_uses_dc_only
         self.radial_subtracts_orthogonal = radial_subtracts_orthogonal
         self.square = square
+        self.n_extra_channels = n_extra_channels
+        self.v2_gabor_orientations = (
+            tuple(v2_gabor_orientations) if v2_gabor_orientations is not None else None
+        )
+        self.v2_gabor_n_frequencies = v2_gabor_n_frequencies
 
         n_init_o = len(initial_orientations)
         n_rec_o = len(recursive_orientations)
-        in_channels = (
+        v4_channels = (
             n_initial_frequencies * n_init_o * n_recursive_frequencies * n_rec_o
         )
+        in_channels = v4_channels + n_extra_channels
         n_targets = len(self.targets)
+
+        n_v2_o = len(self.v2_gabor_orientations) if self.v2_gabor_orientations else 0
+        n_v2_f = v2_gabor_n_frequencies
+        v2_channels_expected = (
+            n_initial_frequencies * n_init_o * n_v2_f * n_v2_o
+        )
+        v2_init_active = (
+            n_v2_o > 0 and n_v2_f > 0 and v2_channels_expected == n_extra_channels
+        )
 
         weight = torch.zeros(n_targets, in_channels, 1, 1)
         for t_idx, target in enumerate(self.targets):
@@ -678,6 +784,59 @@ class LieGroupCells(nn.Module):
                 neg_mask = weight[t_idx] < 0
                 weight[t_idx][neg_mask] /= n_neg
 
+            if v2_init_active:
+                v2_pos: list[tuple[int, int]] = []
+                v2_neg: list[tuple[int, int]] = []
+                for delta in deltas:
+                    for i, theta_i in enumerate(initial_orientations):
+                        target_theta = (theta_i + delta) % math.pi
+                        j = _closest_orient_index(target_theta, self.v2_gabor_orientations)
+                        v2_pos.append((i, j))
+                if is_radial and radial_subtracts_orthogonal:
+                    competing = [math.pi / 2, math.pi / 4, -math.pi / 4]
+                    for cdelta in competing:
+                        for i, theta_i in enumerate(initial_orientations):
+                            comp_theta = (theta_i + cdelta) % math.pi
+                            k = _closest_orient_index(comp_theta, self.v2_gabor_orientations)
+                            v2_neg.append((i, k))
+
+                v2_n_pos = 0
+                for i, j in v2_pos:
+                    for fi in range(n_initial_frequencies):
+                        for v2fi in range(n_v2_f):
+                            v2_local = (
+                                fi * (n_init_o * n_v2_f * n_v2_o)
+                                + i * (n_v2_f * n_v2_o)
+                                + v2fi * n_v2_o
+                                + j
+                            )
+                            ch = v4_channels + v2_local
+                            weight[t_idx, ch, 0, 0] = 1.0
+                            v2_n_pos += 1
+                if v2_n_pos > 0:
+                    v2_slice = weight[t_idx, v4_channels:, 0, 0]
+                    pos_mask = v2_slice > 0
+                    v2_slice[pos_mask] = v2_slice[pos_mask] / v2_n_pos
+
+                v2_n_neg = 0
+                for i, k in v2_neg:
+                    for fi in range(n_initial_frequencies):
+                        for v2fi in range(n_v2_f):
+                            v2_local = (
+                                fi * (n_init_o * n_v2_f * n_v2_o)
+                                + i * (n_v2_f * n_v2_o)
+                                + v2fi * n_v2_o
+                                + k
+                            )
+                            ch = v4_channels + v2_local
+                            if weight[t_idx, ch, 0, 0] == 0.0:
+                                weight[t_idx, ch, 0, 0] = -1.0
+                                v2_n_neg += 1
+                if v2_n_neg > 0:
+                    v2_slice = weight[t_idx, v4_channels:, 0, 0]
+                    neg_mask = v2_slice < 0
+                    v2_slice[neg_mask] = v2_slice[neg_mask] / v2_n_neg
+
         self.conv = nn.Conv2d(in_channels, n_targets, kernel_size=1, bias=True)
         with torch.no_grad():
             self.conv.weight.copy_(weight)
@@ -708,9 +867,22 @@ class LieGroupCells(nn.Module):
             flat_blocks.append(block.reshape(b, n_init * n_rf * n_ro, h, w))
         return torch.cat(flat_blocks, dim=1)
 
-    def forward(self, v4_per_freq: Sequence[torch.Tensor]) -> torch.Tensor:
-        """Returns (B, n_targets, H, W)."""
+    def forward(
+        self,
+        v4_per_freq: Sequence[torch.Tensor],
+        extra_channels: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        """Returns (B, n_targets, H, W).
+
+        ``extra_channels`` may be provided as additional (B, C_extra, H, W)
+        feature maps -- e.g. V2 Gabor power maps -- which are concatenated
+        to the flattened V4 tensor along the channel axis before the 1x1
+        conv. The extra-channel weights are zero-initialized so the
+        analytic baseline is preserved.
+        """
         flat = self.flatten_v4(v4_per_freq)
+        if extra_channels is not None:
+            flat = torch.cat([flat, extra_channels], dim=1)
         return self.forward_flat(flat)
 
     def forward_flat(self, v4_flat: torch.Tensor) -> torch.Tensor:
@@ -748,6 +920,11 @@ class RecursiveFiltersV4WithReadout(nn.Module):
         v4_dc_surround_ratio: float = 1.5,
         v4_dc_from_v1: bool = True,
         v4_dc_kernel_size: int | None = None,
+        use_v2_gabor: bool = False,
+        v2_gabor_orientations: Sequence[float] | None = None,
+        v2_gabor_frequencies: Sequence[float] | None = None,
+        v2_gabor_kernel_size: int = 33,
+        v2_gabor_sigma_to_period: float = 0.5,
         radial_uses_dc_only: bool = False,
         radial_subtracts_orthogonal: bool = True,
         square_lie_cells: bool = False,
@@ -769,9 +946,23 @@ class RecursiveFiltersV4WithReadout(nn.Module):
             v4_dc_surround_ratio=v4_dc_surround_ratio,
             v4_dc_from_v1=v4_dc_from_v1,
             v4_dc_kernel_size=v4_dc_kernel_size,
+            use_v2_gabor=use_v2_gabor,
+            v2_gabor_orientations=v2_gabor_orientations,
+            v2_gabor_frequencies=v2_gabor_frequencies,
+            v2_gabor_kernel_size=v2_gabor_kernel_size,
+            v2_gabor_sigma_to_period=v2_gabor_sigma_to_period,
         )
         n_recursive_frequencies = recursive_octaves + (1 if use_v4_dc_channel else 0)
         dc_slot_index = recursive_octaves if use_v4_dc_channel else None
+        n_extra = (
+            self.backbone.v2_gabor.n_outputs if self.backbone.v2_gabor is not None else 0
+        )
+        v2_g_orientations = (
+            self.backbone.v2_gabor.spec.orientations if self.backbone.v2_gabor is not None else None
+        )
+        v2_g_n_freqs = (
+            self.backbone.v2_gabor.spec.n_frequencies if self.backbone.v2_gabor is not None else 0
+        )
         self.lie_cells = LieGroupCells(
             targets=targets,
             initial_orientations=v1_spec.orientations,
@@ -783,11 +974,15 @@ class RecursiveFiltersV4WithReadout(nn.Module):
             radial_subtracts_orthogonal=radial_subtracts_orthogonal,
             square=square_lie_cells,
             trainable=trainable_lie_cells,
+            n_extra_channels=n_extra,
+            v2_gabor_orientations=v2_g_orientations,
+            v2_gabor_n_frequencies=v2_g_n_freqs,
         )
 
     def forward(self, x: torch.Tensor) -> dict:
         out = self.backbone(x)
-        out["lie_cells"] = self.lie_cells(out["v4_power"])
+        extra = out.get("v2_gabor")
+        out["lie_cells"] = self.lie_cells(out["v4_power"], extra_channels=extra)
         return out
 
 

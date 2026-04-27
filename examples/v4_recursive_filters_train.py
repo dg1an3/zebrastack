@@ -190,7 +190,7 @@ def main() -> int:
     print(f"  test accuracy (raw argmax): {base_acc:.3f}")
     print_matrix(base_cm)
 
-    print("\n--- Training the LieGroupCells 1x1 conv ---")
+    print("\n--- Training the LieGroupCells 1x1 conv (with V2 Gabor stage) ---")
     trained = RecursiveFiltersV4WithReadout(
         v1_spec=spec,
         targets=tuple(CLASS_NAMES),
@@ -204,8 +204,16 @@ def main() -> int:
         radial_subtracts_orthogonal=False,
         use_v2_mixing=args.train_v2,
         trainable_v2_mix=args.train_v2,
+        use_v2_gabor=True,
+        v2_gabor_frequencies=(0.07, 0.035),
+        v2_gabor_kernel_size=33,
         trainable_lie_cells=True,
     )
+    if trained.backbone.v2_gabor is not None:
+        n_extra = trained.backbone.v2_gabor.n_outputs
+        print(f"  V2 Gabor adds {n_extra} extra feature channels "
+              f"(per-V1-channel bank: {trained.backbone.v2_gabor.bank.n_outputs} outputs "
+              f"x {trained.backbone.v2_gabor.n_input_channels} V1 channels)")
     head = ReadoutHead(len(CLASS_NAMES))
     train(
         trained, head, train_x, train_y,
