@@ -110,12 +110,12 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--data", default="/tmp/cifar10_imgs/CIFAR-10-images-master")
     parser.add_argument("--out", default="examples/cifar10_train.png")
-    parser.add_argument("--size", type=int, default=96)
-    parser.add_argument("--n-train-per-class", type=int, default=500,
-                        help="subset size per class (default 500 = 5000 total)")
-    parser.add_argument("--n-test-per-class", type=int, default=100,
-                        help="test subset per class (default 100 = 1000 total)")
-    parser.add_argument("--epochs", type=int, default=8)
+    parser.add_argument("--size", type=int, default=64)
+    parser.add_argument("--n-train-per-class", type=int, default=200,
+                        help="subset size per class (default 200 = 2000 total)")
+    parser.add_argument("--n-test-per-class", type=int, default=50,
+                        help="test subset per class (default 50 = 500 total)")
+    parser.add_argument("--epochs", type=int, default=6)
     parser.add_argument("--lr", type=float, default=0.005)
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--weight-decay", type=float, default=1e-4)
@@ -138,22 +138,17 @@ def main() -> int:
 
     spec = standard_v1_spec(
         n_orientations=4,
-        frequencies=(0.22, 0.14, 0.09, 0.06),
-        kernel_size=21,
+        frequencies=(0.30, 0.18, 0.10),
+        kernel_size=13,
     )
     v4 = RecursiveFiltersV4(
         v1_spec=spec,
         recursive_octaves=2,
-        recursive_kernel_size=33,
+        recursive_kernel_size=21,
         use_v2_pooling=True,
         v2_sigma_to_period=2.0,
-        use_v4_dc_channel=True,
-        v4_dc_sigma_long=12.0,
-        v4_dc_surround_ratio=1.5,
-        v4_dc_kernel_size=49,
-        use_v2_gabor=True,
-        v2_gabor_frequencies=(0.07, 0.035),
-        v2_gabor_kernel_size=25,
+        use_v4_dc_channel=False,
+        use_v2_gabor=False,
     )
     model = FullVentralStream(
         v4_backbone=v4,
@@ -164,7 +159,7 @@ def main() -> int:
         pit_frequencies=(0.05, 0.025),
         cit_frequencies=(0.05, 0.025),
         ait_frequencies=(0.05, 0.025),
-        kernel_size=17,
+        kernel_size=11,
         downsample=2,
     ).to(device)
 
