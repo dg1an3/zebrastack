@@ -37,6 +37,30 @@ from .v4_recursive_filters import (
 )
 
 
+class SEBlock(nn.Module):
+    """Squeeze-and-Excitation channel attention.
+
+    Computes a learned per-channel gating from a global summary of the
+    feature map: globally average-pool, run through a small MLP
+    (squeeze + excite), apply sigmoid, multiply by the original feature
+    map. Biologically analogous to attentional modulation in V4/IT --
+    cells whose preferred features are present in the global context
+    are amplified, others suppressed.
+    """
+
+    def __init__(self, n_channels: int, reduction: int = 4):
+        super().__init__()
+        hidden = max(n_channels // reduction, 4)
+        self.fc1 = nn.Conv2d(n_channels, hidden, kernel_size=1)
+        self.fc2 = nn.Conv2d(hidden, n_channels, kernel_size=1)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        s = x.mean(dim=(-1, -2), keepdim=True)
+        s = F.relu(self.fc1(s))
+        s = torch.sigmoid(self.fc2(s))
+        return x * s
+
+
 class ITStage(nn.Module):
     """One IT-level stage: 1x1 channel reduce + per-channel Gabor power + pool.
 
@@ -59,12 +83,15 @@ class ITStage(nn.Module):
         downsample: int = 2,
         use_relu_on_reduce: bool = True,
         use_bn: bool = True,
+        use_attention: bool = False,
+        attention_reduction: int = 4,
     ):
         super().__init__()
         self.reduce = nn.Conv2d(in_channels, n_reduce, kernel_size=1, bias=not use_bn)
         self.bn = nn.BatchNorm2d(n_reduce) if use_bn else nn.Identity()
         self.use_relu_on_reduce = use_relu_on_reduce
         self.n_reduce = n_reduce
+        self.se = SEBlock(n_reduce, reduction=attention_reduction) if use_attention else None
 
         spec = FilterBankSpec(
             orientations=tuple(gabor_orientations),
@@ -86,6 +113,8 @@ class ITStage(nn.Module):
         x = self.bn(x)
         if self.use_relu_on_reduce:
             x = F.relu(x)
+        if self.se is not None:
+            x = self.se(x)
         b, c, h, w = x.shape
         x_flat = x.reshape(b * c, 1, h, w)
         out = self.bank(x_flat).view(b, c * self.bank.n_outputs, h, w)
@@ -161,6 +190,7 @@ class FullVentralStream(nn.Module):
         kernel_size: int = 21,
         downsample: int = 2,
         use_skip: bool = False,
+        use_attention: bool = False,
     ):
         super().__init__()
         self.backbone = V4Backbone(v4_backbone)
@@ -174,6 +204,7 @@ class FullVentralStream(nn.Module):
             gabor_frequencies=pit_frequencies,
             kernel_size=kernel_size,
             downsample=downsample,
+            use_attention=use_attention,
         )
         self.cit = ITStage(
             in_channels=self.pit.n_outputs,
@@ -182,6 +213,7 @@ class FullVentralStream(nn.Module):
             gabor_frequencies=cit_frequencies,
             kernel_size=kernel_size,
             downsample=downsample,
+            use_attention=use_attention,
         )
         self.ait = ITStage(
             in_channels=self.cit.n_outputs,
@@ -190,6 +222,7 @@ class FullVentralStream(nn.Module):
             gabor_frequencies=ait_frequencies,
             kernel_size=kernel_size,
             downsample=1,
+            use_attention=use_attention,
         )
 
         self.input_norm = nn.BatchNorm2d(self.backbone.n_outputs)
