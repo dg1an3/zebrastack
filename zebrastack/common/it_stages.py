@@ -58,9 +58,11 @@ class ITStage(nn.Module):
         sigma_to_period: float = 0.5,
         downsample: int = 2,
         use_relu_on_reduce: bool = True,
+        use_bn: bool = True,
     ):
         super().__init__()
-        self.reduce = nn.Conv2d(in_channels, n_reduce, kernel_size=1, bias=True)
+        self.reduce = nn.Conv2d(in_channels, n_reduce, kernel_size=1, bias=not use_bn)
+        self.bn = nn.BatchNorm2d(n_reduce) if use_bn else nn.Identity()
         self.use_relu_on_reduce = use_relu_on_reduce
         self.n_reduce = n_reduce
 
@@ -72,6 +74,7 @@ class ITStage(nn.Module):
         )
         self.spec = spec
         self.bank = GaborPowerBank(spec)
+        self.bn_post = nn.BatchNorm2d(n_reduce * self.bank.n_outputs) if use_bn else nn.Identity()
         self.downsample = downsample
 
     @property
@@ -80,11 +83,13 @@ class ITStage(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.reduce(x)
+        x = self.bn(x)
         if self.use_relu_on_reduce:
             x = F.relu(x)
         b, c, h, w = x.shape
         x_flat = x.reshape(b * c, 1, h, w)
         out = self.bank(x_flat).view(b, c * self.bank.n_outputs, h, w)
+        out = self.bn_post(out)
         if self.downsample > 1:
             out = F.avg_pool2d(out, kernel_size=self.downsample, stride=self.downsample)
         return out
@@ -186,10 +191,12 @@ class FullVentralStream(nn.Module):
         )
 
         self.classifier = nn.Conv2d(self.ait.n_outputs, n_classes, kernel_size=1)
+        self.input_norm = nn.BatchNorm2d(self.backbone.n_outputs)
 
     def forward(self, x: torch.Tensor) -> dict[str, torch.Tensor]:
         v4 = self.backbone(x)
-        pit = self.pit(v4)
+        v4_norm = self.input_norm(v4)
+        pit = self.pit(v4_norm)
         cit = self.cit(pit)
         ait = self.ait(cit)
         ait_pooled = ait.mean(dim=(-1, -2), keepdim=True)
@@ -202,3 +209,17 @@ class FullVentralStream(nn.Module):
             "ait_pooled": ait_pooled,
             "logits": logits,
         }
+
+    @torch.no_grad()
+    def recalibrate_bn(self, calibration_x: torch.Tensor, batch_size: int = 16):
+        """Propagate training-set stats through all BN layers in train mode."""
+        self.train()
+        for bn in self.modules():
+            if isinstance(bn, nn.BatchNorm2d):
+                bn.reset_running_stats()
+        # Two passes with momentum=None equivalent: set momentum to 1/n
+        n_passes = 4
+        for _ in range(n_passes):
+            for i in range(0, calibration_x.shape[0], batch_size):
+                _ = self(calibration_x[i:i+batch_size])
+        self.eval()

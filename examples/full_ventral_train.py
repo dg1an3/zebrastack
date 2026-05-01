@@ -150,6 +150,8 @@ def main() -> int:
 
     train(model, train_x, train_y, epochs=args.epochs, lr=args.lr,
           batch_size=args.batch_size, weight_decay=args.weight_decay)
+    print("\n  recalibrating BN running stats from trained model...")
+    model.recalibrate_bn(train_x)
     acc, cm = confusion(model, test_x, test_y)
     print(f"\n  test accuracy: {acc:.3f}")
     print_matrix(cm)
