@@ -86,6 +86,8 @@ def main() -> int:
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--weight-decay", type=float, default=1e-4)
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
+    parser.add_argument("--use-skip", action="store_true",
+                        help="Use multi-scale skip connections to the classifier.")
     args = parser.parse_args()
     matplotlib.use("Agg")
 
@@ -142,6 +144,7 @@ def main() -> int:
         ait_frequencies=(0.05, 0.025),
         kernel_size=11,
         downsample=2,
+        use_skip=args.use_skip,
     ).to(device)
     n_trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f"Trainable parameters: {n_trainable}")
@@ -194,7 +197,8 @@ def main() -> int:
     ax.set_xticklabels(CLASS_NAMES, rotation=45, ha="right")
     ax.set_yticklabels(CLASS_NAMES)
     ax.set_xlabel("predicted"); ax.set_ylabel("true")
-    ax.set_title(f"FullVentralStream on Fashion-MNIST ({args.size}px)\n"
+    skip_str = " + skip" if args.use_skip else ""
+    ax.set_title(f"FullVentralStream{skip_str} on Fashion-MNIST ({args.size}px)\n"
                  f"test acc = {test_acc:.3f}, params = {n_trainable}")
     plt.colorbar(im, ax=ax)
     fig.tight_layout()

@@ -160,9 +160,11 @@ class FullVentralStream(nn.Module):
         n_orientations: int = 4,
         kernel_size: int = 21,
         downsample: int = 2,
+        use_skip: bool = False,
     ):
         super().__init__()
         self.backbone = V4Backbone(v4_backbone)
+        self.use_skip = use_skip
 
         orientations = standard_orientations(n_orientations)
         self.pit = ITStage(
@@ -190,8 +192,25 @@ class FullVentralStream(nn.Module):
             downsample=1,
         )
 
-        self.classifier = nn.Conv2d(self.ait.n_outputs, n_classes, kernel_size=1)
         self.input_norm = nn.BatchNorm2d(self.backbone.n_outputs)
+
+        if use_skip:
+            # Multi-scale skip: globally average-pool every stage,
+            # BN-normalize per stage to balance magnitudes, concatenate,
+            # feed to a single linear classifier.
+            self.v4_pool_bn = nn.BatchNorm1d(self.backbone.n_outputs)
+            self.pit_pool_bn = nn.BatchNorm1d(self.pit.n_outputs)
+            self.cit_pool_bn = nn.BatchNorm1d(self.cit.n_outputs)
+            self.ait_pool_bn = nn.BatchNorm1d(self.ait.n_outputs)
+            total_dim = (
+                self.backbone.n_outputs
+                + self.pit.n_outputs
+                + self.cit.n_outputs
+                + self.ait.n_outputs
+            )
+            self.classifier = nn.Linear(total_dim, n_classes)
+        else:
+            self.classifier = nn.Conv2d(self.ait.n_outputs, n_classes, kernel_size=1)
 
     def forward(self, x: torch.Tensor) -> dict[str, torch.Tensor]:
         v4 = self.backbone(x)
@@ -199,6 +218,21 @@ class FullVentralStream(nn.Module):
         pit = self.pit(v4_norm)
         cit = self.cit(pit)
         ait = self.ait(cit)
+
+        if self.use_skip:
+            v4_pool = self.v4_pool_bn(v4.mean(dim=(-1, -2)))
+            pit_pool = self.pit_pool_bn(pit.mean(dim=(-1, -2)))
+            cit_pool = self.cit_pool_bn(cit.mean(dim=(-1, -2)))
+            ait_pool = self.ait_pool_bn(ait.mean(dim=(-1, -2)))
+            concat = torch.cat([v4_pool, pit_pool, cit_pool, ait_pool], dim=1)
+            logits = self.classifier(concat)
+            return {
+                "v4": v4, "pit": pit, "cit": cit, "ait": ait,
+                "v4_pool": v4_pool, "pit_pool": pit_pool,
+                "cit_pool": cit_pool, "ait_pool": ait_pool,
+                "logits": logits,
+            }
+
         ait_pooled = ait.mean(dim=(-1, -2), keepdim=True)
         logits = self.classifier(ait_pooled).squeeze(-1).squeeze(-1)
         return {
@@ -222,7 +256,7 @@ class FullVentralStream(nn.Module):
         """
         saved = []
         for m in self.modules():
-            if isinstance(m, nn.BatchNorm2d):
+            if isinstance(m, (nn.BatchNorm1d, nn.BatchNorm2d)):
                 saved.append((m, m.momentum, m.training))
                 m.momentum = None
                 m.reset_running_stats()
