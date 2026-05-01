@@ -1,0 +1,204 @@
+"""V1 -> V2 -> V4 -> PIT -> CIT -> AIT ventral-stream model.
+
+Extends the recursive-filters V4 backbone with progressively coarser-
+scale Inception-style stages modelling the inferotemporal hierarchy
+(PIT, CIT, AIT). Each IT stage is a small 1x1 Conv2d "reduction"
+(analogous to Inception's channel-reducing 1x1) followed by a
+per-channel Gabor power bank at that stage's spatial scale, followed
+by spatial average-pool downsampling. Final classification reads
+from the spatially-pooled AIT representation.
+
+The fixed Gabor + power primitive carries through every level, so the
+whole stack is hierarchical bandpass filtering with learnable channel
+mixing at each level -- the structural pattern Lane (1995) proposed
+for V1 -> V4 carried through to IT, with 1x1 convs supplying the
+cross-channel mixing that lets the model build compound features.
+
+Inception parallel:
+    Inception 1x1 reduce + 3x3/5x5 conv  ~   ITStage 1x1 reduce + Gabor power
+    Inception max/avg pool branch        ~   ITStage spatial avgpool downsample
+    Inception concat across branches     ~   per-channel Gabor expands feature dim
+"""
+
+from __future__ import annotations
+
+from typing import Sequence
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+from .v4_recursive_filters import (
+    FilterBankSpec,
+    GaborPowerBank,
+    LieGroupCells,
+    RecursiveFiltersV4,
+    standard_orientations,
+)
+
+
+class ITStage(nn.Module):
+    """One IT-level stage: 1x1 channel reduce + per-channel Gabor power + pool.
+
+    Parameters mirror the V4 recursive-filter pattern: a small set of
+    orientations and a couple of spatial frequencies appropriate to this
+    level of the hierarchy. Channels-in get reduced via a 1x1 Conv2d so
+    the per-channel Gabor expansion stays manageable.
+
+    Output shape: (B, n_reduce * n_orient * n_freq, H/down, W/down).
+    """
+
+    def __init__(
+        self,
+        in_channels: int,
+        n_reduce: int,
+        gabor_orientations: Sequence[float],
+        gabor_frequencies: Sequence[float],
+        kernel_size: int,
+        sigma_to_period: float = 0.5,
+        downsample: int = 2,
+        use_relu_on_reduce: bool = True,
+    ):
+        super().__init__()
+        self.reduce = nn.Conv2d(in_channels, n_reduce, kernel_size=1, bias=True)
+        self.use_relu_on_reduce = use_relu_on_reduce
+        self.n_reduce = n_reduce
+
+        spec = FilterBankSpec(
+            orientations=tuple(gabor_orientations),
+            frequencies=tuple(gabor_frequencies),
+            kernel_size=kernel_size,
+            sigma_to_period=sigma_to_period,
+        )
+        self.spec = spec
+        self.bank = GaborPowerBank(spec)
+        self.downsample = downsample
+
+    @property
+    def n_outputs(self) -> int:
+        return self.n_reduce * self.bank.n_outputs
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.reduce(x)
+        if self.use_relu_on_reduce:
+            x = F.relu(x)
+        b, c, h, w = x.shape
+        x_flat = x.reshape(b * c, 1, h, w)
+        out = self.bank(x_flat).view(b, c * self.bank.n_outputs, h, w)
+        if self.downsample > 1:
+            out = F.avg_pool2d(out, kernel_size=self.downsample, stride=self.downsample)
+        return out
+
+
+class V4Backbone(nn.Module):
+    """Wraps RecursiveFiltersV4 + V2 Gabor and returns a flat feature map.
+
+    Concatenates the V4 power maps (bandpass + DC slot) and V2 Gabor
+    features into a single (B, C, H, W) tensor that downstream IT
+    stages can consume. This is the V1 -> V2 -> V4 stack already
+    described, repackaged as a feature extractor for the ventral stack.
+    """
+
+    def __init__(self, backbone: RecursiveFiltersV4):
+        super().__init__()
+        self.backbone = backbone
+
+    @property
+    def n_outputs(self) -> int:
+        v4_channels = (
+            self.backbone.v1_spec.n_frequencies
+            * self.backbone.v1_spec.n_orientations
+            * (self.backbone.recursive_octaves
+               + (1 if self.backbone.use_v4_dc_channel else 0))
+            * len(self.backbone.recursive_orientations)
+        )
+        v2_extra = (
+            self.backbone.v2_gabor.n_outputs
+            if self.backbone.v2_gabor is not None else 0
+        )
+        return v4_channels + v2_extra
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        out = self.backbone(x)
+        flat_blocks = []
+        for block in out["v4_power"]:
+            b, n_init, n_rf, n_ro, h, w = block.shape
+            flat_blocks.append(block.reshape(b, n_init * n_rf * n_ro, h, w))
+        v4_flat = torch.cat(flat_blocks, dim=1)
+        if "v2_gabor" in out:
+            return torch.cat([v4_flat, out["v2_gabor"]], dim=1)
+        return v4_flat
+
+
+class FullVentralStream(nn.Module):
+    """V1 -> V2 -> V4 -> PIT -> CIT -> AIT classifier.
+
+    The V1>V2>V4 backbone is the existing recursive-filters model. PIT,
+    CIT, and AIT each follow the same template: 1x1 reduce + per-channel
+    Gabor power bank + spatial avgpool. The Gabor frequencies decrease
+    by an octave per stage, so each stage operates at coarser scale than
+    the last, mirroring the increasing receptive-field size along the
+    ventral stream. AIT does global average pooling; a final 1x1 Conv2d
+    + softmax classifier reads from the pooled AIT representation.
+    """
+
+    def __init__(
+        self,
+        v4_backbone: RecursiveFiltersV4,
+        n_classes: int,
+        pit_n_reduce: int = 16,
+        cit_n_reduce: int = 16,
+        ait_n_reduce: int = 16,
+        pit_frequencies: Sequence[float] = (0.05, 0.025),
+        cit_frequencies: Sequence[float] = (0.05, 0.025),
+        ait_frequencies: Sequence[float] = (0.05, 0.025),
+        n_orientations: int = 4,
+        kernel_size: int = 21,
+        downsample: int = 2,
+    ):
+        super().__init__()
+        self.backbone = V4Backbone(v4_backbone)
+
+        orientations = standard_orientations(n_orientations)
+        self.pit = ITStage(
+            in_channels=self.backbone.n_outputs,
+            n_reduce=pit_n_reduce,
+            gabor_orientations=orientations,
+            gabor_frequencies=pit_frequencies,
+            kernel_size=kernel_size,
+            downsample=downsample,
+        )
+        self.cit = ITStage(
+            in_channels=self.pit.n_outputs,
+            n_reduce=cit_n_reduce,
+            gabor_orientations=orientations,
+            gabor_frequencies=cit_frequencies,
+            kernel_size=kernel_size,
+            downsample=downsample,
+        )
+        self.ait = ITStage(
+            in_channels=self.cit.n_outputs,
+            n_reduce=ait_n_reduce,
+            gabor_orientations=orientations,
+            gabor_frequencies=ait_frequencies,
+            kernel_size=kernel_size,
+            downsample=1,
+        )
+
+        self.classifier = nn.Conv2d(self.ait.n_outputs, n_classes, kernel_size=1)
+
+    def forward(self, x: torch.Tensor) -> dict[str, torch.Tensor]:
+        v4 = self.backbone(x)
+        pit = self.pit(v4)
+        cit = self.cit(pit)
+        ait = self.ait(cit)
+        ait_pooled = ait.mean(dim=(-1, -2), keepdim=True)
+        logits = self.classifier(ait_pooled).squeeze(-1).squeeze(-1)
+        return {
+            "v4": v4,
+            "pit": pit,
+            "cit": cit,
+            "ait": ait,
+            "ait_pooled": ait_pooled,
+            "logits": logits,
+        }
