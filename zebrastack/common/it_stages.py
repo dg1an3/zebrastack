@@ -212,14 +212,27 @@ class FullVentralStream(nn.Module):
 
     @torch.no_grad()
     def recalibrate_bn(self, calibration_x: torch.Tensor, batch_size: int = 16):
-        """Propagate training-set stats through all BN layers in train mode."""
-        self.train()
-        for bn in self.modules():
-            if isinstance(bn, nn.BatchNorm2d):
-                bn.reset_running_stats()
-        # Two passes with momentum=None equivalent: set momentum to 1/n
-        n_passes = 4
-        for _ in range(n_passes):
+        """Set BN running stats to cumulative averages over the training set.
+
+        Switches every BatchNorm2d to cumulative-average mode
+        (``momentum=None``) and runs one pass over the training data, so
+        the running mean/var after the pass are the exact training-set
+        statistics rather than a momentum-decayed approximation. Then
+        restores the saved momenta and switches the model to eval mode.
+        """
+        saved = []
+        for m in self.modules():
+            if isinstance(m, nn.BatchNorm2d):
+                saved.append((m, m.momentum, m.training))
+                m.momentum = None
+                m.reset_running_stats()
+                m.train()
+        try:
             for i in range(0, calibration_x.shape[0], batch_size):
                 _ = self(calibration_x[i:i+batch_size])
+        finally:
+            for m, momentum, was_training in saved:
+                m.momentum = momentum
+                if not was_training:
+                    m.eval()
         self.eval()
