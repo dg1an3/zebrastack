@@ -101,6 +101,8 @@ def main() -> int:
     parser.add_argument("--use-nonlocal", action="store_true",
                         help="Add a low-rank non-local self-attention block at AIT.")
     parser.add_argument("--nonlocal-dim", type=int, default=16)
+    parser.add_argument("--lr-schedule", choices=["none", "cosine"], default="none",
+                        help="LR schedule. 'cosine' anneals from --lr to 0 over --epochs.")
     args = parser.parse_args()
     matplotlib.use("Agg")
 
@@ -174,6 +176,10 @@ def main() -> int:
         [p for p in model.parameters() if p.requires_grad],
         lr=args.lr, weight_decay=args.weight_decay,
     )
+    if args.lr_schedule == "cosine":
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs)
+    else:
+        scheduler = None
     criterion = nn.CrossEntropyLoss()
 
     for epoch in range(args.epochs):
@@ -189,7 +195,10 @@ def main() -> int:
             total_loss += loss.item() * x.shape[0]
             total_correct += int((logits.argmax(dim=-1) == y).sum().item())
             total += x.shape[0]
-        print(f"  epoch {epoch+1:2d}: loss={total_loss/total:.4f} train_acc={total_correct/total:.3f}")
+        cur_lr = optimizer.param_groups[0]["lr"]
+        print(f"  epoch {epoch+1:2d}: lr={cur_lr:.4f} loss={total_loss/total:.4f} train_acc={total_correct/total:.3f}")
+        if scheduler is not None:
+            scheduler.step()
 
     print("\n  recalibrating BN running stats...")
     cal_x = train_x[: min(512, len(train_x))].to(device)
@@ -224,6 +233,7 @@ def main() -> int:
     if args.use_topdown:   extras.append("topdown")
     if args.use_dlpfc:     extras.append(f"dlpfc(K={args.dlpfc_slots},d={args.dlpfc_dim})")
     if args.use_nonlocal:  extras.append(f"nonlocal(d={args.nonlocal_dim})")
+    if args.lr_schedule != "none": extras.append(f"{args.lr_schedule}-lr")
     extras_str = (" + " + " + ".join(extras)) if extras else ""
     ax.set_title(f"FullVentralStream{extras_str} on Fashion-MNIST ({args.size}px)\n"
                  f"test acc = {test_acc:.3f}, params = {n_trainable}")
