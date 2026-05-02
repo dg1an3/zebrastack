@@ -265,3 +265,6 @@ __pycache__/
 /*/models
 /*/data/*
 **/env/
+
+venv39/
+venv311/

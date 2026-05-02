@@ -89,7 +89,18 @@ def main() -> int:
     parser.add_argument("--use-skip", action="store_true",
                         help="Use multi-scale skip connections to the classifier.")
     parser.add_argument("--use-attention", action="store_true",
-                        help="Use SE channel attention on the 1x1 reduce in each IT stage.")
+                        help="Use channel attention in each IT stage. Kind set by --attention.")
+    parser.add_argument("--attention", choices=["se", "cbam", "coord"], default="se",
+                        help="Attention block kind when --use-attention is set.")
+    parser.add_argument("--use-topdown", action="store_true",
+                        help="Add top-down feedback gates from AIT context to PIT/CIT outputs.")
+    parser.add_argument("--use-dlpfc", action="store_true",
+                        help="Add a dlPFC slot-attention readout above AIT.")
+    parser.add_argument("--dlpfc-slots", type=int, default=4)
+    parser.add_argument("--dlpfc-dim", type=int, default=32)
+    parser.add_argument("--use-nonlocal", action="store_true",
+                        help="Add a low-rank non-local self-attention block at AIT.")
+    parser.add_argument("--nonlocal-dim", type=int, default=16)
     args = parser.parse_args()
     matplotlib.use("Agg")
 
@@ -148,6 +159,13 @@ def main() -> int:
         downsample=2,
         use_skip=args.use_skip,
         use_attention=args.use_attention,
+        attention_kind=args.attention,
+        use_topdown=args.use_topdown,
+        use_dlpfc=args.use_dlpfc,
+        dlpfc_slots=args.dlpfc_slots,
+        dlpfc_dim=args.dlpfc_dim,
+        use_nonlocal=args.use_nonlocal,
+        nonlocal_dim=args.nonlocal_dim,
     ).to(device)
     n_trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f"Trainable parameters: {n_trainable}")
@@ -201,8 +219,11 @@ def main() -> int:
     ax.set_yticklabels(CLASS_NAMES)
     ax.set_xlabel("predicted"); ax.set_ylabel("true")
     extras = []
-    if args.use_skip:     extras.append("skip")
-    if args.use_attention: extras.append("attn")
+    if args.use_skip:      extras.append("skip")
+    if args.use_attention: extras.append(args.attention)
+    if args.use_topdown:   extras.append("topdown")
+    if args.use_dlpfc:     extras.append(f"dlpfc(K={args.dlpfc_slots},d={args.dlpfc_dim})")
+    if args.use_nonlocal:  extras.append(f"nonlocal(d={args.nonlocal_dim})")
     extras_str = (" + " + " + ".join(extras)) if extras else ""
     ax.set_title(f"FullVentralStream{extras_str} on Fashion-MNIST ({args.size}px)\n"
                  f"test acc = {test_acc:.3f}, params = {n_trainable}")
